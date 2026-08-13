@@ -4,11 +4,10 @@ global:
 
 configs:
   params:
-    server.insecure: false
+    # false だと Gateway からの平文リクエストに 307 を返し続けてループする
+    server.insecure: true
 
 server:
   service:
-    type: LoadBalancer
-    annotations:
-      # Cilium LB IPAM に Ingress VIP を割り当てさせる
-      lbipam.cilium.io/ips: "203.0.113.4" # terraform output ingress_vip
+    # VIP は Gateway が持つ
+    type: ClusterIP

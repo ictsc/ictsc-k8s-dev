@@ -1,0 +1,10 @@
+# このファイルは `task render-env-values` が terraform output から生成する
+extraArgs:
+  oidc-issuer-url: https://dex.k8s.ictsc.net
+  # redirect-url は固定しない。oauth2-proxy は戻り先を相対パスでしか保持せず、
+  # callback を別ホストに置くとログイン後に元のアプリへ戻れない
+  cookie-domain: .k8s.ictsc.net
+  whitelist-domain: .k8s.ictsc.net
+  # X-Forwarded-* を信用する送信元を Gateway (Envoy) が居る Pod CIDR に限定する。
+  # 未設定だと全 IP からの詐称を受け入れる
+  trusted-proxy-ip: 10.244.0.0/16

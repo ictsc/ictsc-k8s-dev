@@ -50,6 +50,16 @@ k8sClientRateLimit:
   qps: 20
   burst: 100
 
+# Gateway API。Cilium が Envoy を立てて Gateway / HTTPRoute を実装する。
+#
+# NOTE: Gateway API の CRD は Cilium より先に入っていないと operator が起動時に
+#       諦めてしまう。`task install-gateway-api-crds` が bootstrap の中で先に走る。
+# NOTE: HTTPRoute の ExternalAuth フィルタ (GEP-1494) は standard チャネルの CRD には
+#       含まれず experimental チャネルが必要。認証を持たないアプリの前段に
+#       oauth2-proxy を挟むのに使うので experimental を入れている。
+gatewayAPI:
+  enabled: true
+
 operator:
   replicas: 2
   rollOutPods: true

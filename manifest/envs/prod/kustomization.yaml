@@ -1,7 +1,14 @@
 resources:
   - ./cilium.yaml
+  - ./cert-manager.yaml
   - ./kubelet-serving-cert-approver.yaml
   - ./metrics-server.yaml
   - ./argocd.yaml
+  - ./dex.yaml
+  - ./oauth2-proxy.yaml
+  - ./httpbin.yaml
   - ./resources/cilium-lb-ip-pool.yaml
   - ./resources/cilium-l2-announcement.yaml
+  - ./resources/gateway.yaml
+  - ./resources/cluster-issuer.yaml
+  - ./resources/httproutes.yaml

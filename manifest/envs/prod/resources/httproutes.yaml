@@ -1,0 +1,105 @@
+# このファイルは `task render-env-values` が terraform output から生成する
+#
+# HTTPRoute は backendRef と同じ namespace に置く (別なら ReferenceGrant が要る)。
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: argocd
+  namespace: argocd
+spec:
+  parentRefs:
+    - name: external
+      namespace: gateway
+      sectionName: https
+  hostnames:
+    - argocd.k8s.ictsc.net
+  rules:
+    - backendRefs:
+        - name: argocd-server
+          port: 80
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: dex
+  namespace: dex
+spec:
+  parentRefs:
+    - name: external
+      namespace: gateway
+      sectionName: https
+  hostnames:
+    - dex.k8s.ictsc.net
+  rules:
+    - backendRefs:
+        - name: dex
+          port: 5556
+---
+# 認証を持たない httpbin を ExternalAuth で保護する。
+# sync-wave を遅らせるのは、認可バックエンドの Service が無い状態でこの Route が
+# 生えると Cilium が ext_authz フィルタを組まず素通しになるため。
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: httpbin
+  namespace: httpbin
+  annotations:
+    argocd.argoproj.io/sync-wave: "10"
+spec:
+  parentRefs:
+    - name: external
+      namespace: gateway
+      sectionName: https
+  hostnames:
+    - httpbin.k8s.ictsc.net
+  rules:
+    # OAuth のやり取りは保護対象から外し、このホスト自身で完結させる
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /oauth2
+      backendRefs:
+        - name: oauth2-proxy
+          namespace: oauth2-proxy
+          port: 80
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /
+      filters:
+        - type: ExternalAuth
+          externalAuth:
+            protocol: HTTP
+            backendRef:
+              kind: Service
+              name: oauth2-proxy
+              namespace: oauth2-proxy
+              port: 80
+            http:
+              # Cookie が無いとログイン済み判定ができない
+              allowedHeaders:
+                - Cookie
+                - X-Forwarded-Proto
+                - X-Forwarded-Host
+              allowedResponseHeaders:
+                - Set-Cookie
+                - X-Auth-Request-User
+                - X-Auth-Request-Email
+      backendRefs:
+        - name: httpbin
+          port: 8080
+---
+apiVersion: gateway.networking.k8s.io/v1beta1
+kind: ReferenceGrant
+metadata:
+  name: httpbin-to-oauth2-proxy
+  namespace: oauth2-proxy
+spec:
+  from:
+    - group: gateway.networking.k8s.io
+      kind: HTTPRoute
+      namespace: httpbin
+  to:
+    - group: ""
+      kind: Service
+      name: oauth2-proxy
