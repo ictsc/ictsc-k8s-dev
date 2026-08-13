@@ -267,9 +267,10 @@ tasks:
         INGRESS_VIP=$(terraform output -raw ingress_vip)
         DOMAIN=$(terraform output -raw domain)
         CLUSTER=$(terraform output -json talos_input | jq -r '.cluster_name')
+        POD_SUBNET=$(terraform output -json talos_input | jq -r '.pod_subnet')
         cd ..
         ./manifest/scripts/render-env.sh \
-          "${ENV}" "${CLUSTER}" "${DOMAIN}" "${INGRESS_VIP}" '{{.ACME_EMAIL}}'
+          "${ENV}" "${CLUSTER}" "${DOMAIN}" "${INGRESS_VIP}" '{{.ACME_EMAIL}}' "${POD_SUBNET}"
   install-gateway-api-crds:
     desc: Gateway API の CRD (experimental チャネル) を導入
     cmds:

@@ -2,14 +2,15 @@
 # terraform output 由来の env 固有の値 (VIP・ドメイン) をマニフェストに流し込む。
 # Taskfile の render-env-values から呼ばれる。
 #
-#   usage: render-env.sh <env> <cluster> <domain> <ingress-vip> <acme-email>
+#   usage: render-env.sh <env> <cluster> <domain> <ingress-vip> <acme-email> <pod-subnet>
 set -euo pipefail
 
-env="${1:?usage: render-env.sh <env> <cluster> <domain> <ingress-vip> <acme-email>}"
+env="${1:?usage: render-env.sh <env> <cluster> <domain> <ingress-vip> <acme-email> <pod-subnet>}"
 cluster="${2:?cluster is required}"
 domain="${3:?domain is required}"
 vip="${4:?ingress vip is required}"
 acme_email="${5:?acme email is required}"
+pod_subnet="${6:?pod subnet is required}"
 
 case "${acme_email}" in
   TODO-*)
@@ -61,6 +62,9 @@ extraArgs:
   # callback を別ホストに置くとログイン後に元のアプリへ戻れない
   cookie-domain: .${domain}
   whitelist-domain: .${domain}
+  # X-Forwarded-* を信用する送信元を Gateway (Envoy) が居る Pod CIDR に限定する。
+  # 未設定だと全 IP からの詐称を受け入れる
+  trusted-proxy-ip: ${pod_subnet}
 EOF
 
 # 保護対象を増やすときは staticClients の redirectURIs に1行足すだけでよい。
