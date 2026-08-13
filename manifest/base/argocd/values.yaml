@@ -1,0 +1,26 @@
+global:
+  domain: argocd.example.invalid # envs/<env>/values/argocd.yaml で上書きする
+
+configs:
+  cm:
+    kustomize.buildOptions: --enable-helm
+    timeout.reconciliation: 60s
+
+controller:
+  replicas: 1
+
+repoServer:
+  replicas: 2
+
+server:
+  replicas: 2
+  # Service の type / IP は envs/<env>/values/argocd.yaml で指定する
+
+applicationSet:
+  replicas: 1
+
+dex:
+  enabled: false
+
+notifications:
+  enabled: false

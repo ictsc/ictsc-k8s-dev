@@ -1,0 +1,47 @@
+# 全ノード共通の machine config パッチ
+machine:
+  install:
+    # nocloud イメージから作ったディスク。さくらのクラウドの virtio ディスクは vda
+    disk: /dev/vda
+    wipe: false
+  features:
+    # kube-proxy を切って Cilium に置き換えるので、
+    # Cilium から見た API Server の入口として KubePrism を使う
+    kubePrism:
+      enabled: true
+      port: 7445
+    hostDNS:
+      enabled: true
+      forwardKubeDNSToHost: true
+  time:
+    disabled: false
+    servers:
+      - ntp1.sakura.ad.jp
+      - ntp2.sakura.ad.jp
+  kubelet:
+    extraArgs:
+      rotate-server-certificates: "true"
+
+cluster:
+  network:
+    # CNI は Cilium を後から入れる
+    cni:
+      name: none
+  # kube-proxy は Cilium の kubeProxyReplacement に任せる
+  proxy:
+    disabled: true
+  discovery:
+    enabled: true
+    registries:
+      # kubernetes レジストリは deprecated。Kubernetes 1.32 以降は
+      # AuthorizeNodeWithSelectors により kubelet が他ノードを list できず
+      #   nodes is forbidden: node 'x' cannot read all nodes, only its own Node object
+      # となって機能しない。これを有効にすると control plane が互いを発見できず
+      # "etcd is waiting to join the cluster" のまま止まる。
+      kubernetes:
+        disabled: true
+      # Talos 既定の discovery service。Kubernetes / etcd に依存しないので
+      # クラスタ形成中でも動く。affiliate 情報はクラスタの共有シークレットで
+      # 暗号化して送られるため、ノード情報が平文で外部に出るわけではない。
+      service:
+        disabled: false

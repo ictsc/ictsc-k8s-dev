@@ -1,0 +1,4 @@
+# このファイルは `task render-env-values` が terraform output から生成する
+cluster:
+  name: ictsc-dev
+  id: 1

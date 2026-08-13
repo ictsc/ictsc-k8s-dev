@@ -1,0 +1,12 @@
+# eth0 (さくらのクラウドのルータ+スイッチ側) で LoadBalancer IP を ARP 広報する
+apiVersion: cilium.io/v2alpha1
+kind: CiliumL2AnnouncementPolicy
+metadata:
+  name: external
+  annotations:
+    argocd.argoproj.io/sync-wave: "-25"
+spec:
+  interfaces:
+    - ^eth0$
+  externalIPs: true
+  loadBalancerIPs: true

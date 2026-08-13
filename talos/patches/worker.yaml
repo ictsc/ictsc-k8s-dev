@@ -1,0 +1,4 @@
+# worker node 専用の machine config パッチ
+machine:
+  nodeLabels:
+    node.kubernetes.io/role: worker

@@ -1,0 +1,14 @@
+# このファイルは `task render-env-values` が terraform output から生成する
+global:
+  domain: argocd.k8s.ictsc.net
+
+configs:
+  params:
+    server.insecure: false
+
+server:
+  service:
+    type: LoadBalancer
+    annotations:
+      # Cilium LB IPAM に Ingress VIP を割り当てさせる
+      lbipam.cilium.io/ips: "203.0.113.4" # terraform output ingress_vip

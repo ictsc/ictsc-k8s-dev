@@ -1,0 +1,29 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: kubelet-serving-cert-approver
+  namespace: argocd
+  annotations:
+    # metrics-server (wave 0) は kubelet の serving 証明書が CA 署名済みである
+    # 前提 (--kubelet-insecure-tls を付けていない) なので、先に承認側を上げる。
+    argocd.argoproj.io/sync-wave: "-1"
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  # Helm chart は提供されておらず、upstream の kustomize ディレクトリを直接参照する。
+  # control plane が 3 台あるので leader election ありの ha を使う。
+  source:
+    repoURL: https://github.com/alex1989hu/kubelet-serving-cert-approver.git
+    targetRevision: v0.11.0
+    path: deploy/ha
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: kubelet-serving-cert-approver
+  syncPolicy:
+    syncOptions:
+      - ServerSideApply=true
+      - CreateNamespace=true
+    automated:
+      prune: true
+      selfHeal: true

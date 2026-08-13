@@ -1,0 +1,68 @@
+# Talos 上で動かすための Cilium の設定
+# https://www.talos.dev/latest/kubernetes-guides/network/deploying-cilium/
+
+# kube-proxy は Talos 側で無効化しているので Cilium が肩代わりする
+kubeProxyReplacement: true
+
+# API Server への到達には Talos の KubePrism (localhost:7445) を使う。
+# CNI が上がる前でも各ノードから API Server に届くのでニワトリ卵問題を回避できる。
+k8sServiceHost: localhost
+k8sServicePort: 7445
+
+ipam:
+  mode: kubernetes
+
+# Talos は cgroupv2 を既にマウント済みなので Cilium 側でマウントさせない
+cgroup:
+  autoMount:
+    enabled: false
+  hostRoot: /sys/fs/cgroup
+
+# Talos の pod security 環境で必要な capability の明示
+securityContext:
+  capabilities:
+    ciliumAgent:
+      - CHOWN
+      - KILL
+      - NET_ADMIN
+      - NET_RAW
+      - IPC_LOCK
+      - SYS_ADMIN
+      - SYS_RESOURCE
+      - DAC_OVERRIDE
+      - FOWNER
+      - SETGID
+      - SETUID
+    cleanCiliumState:
+      - NET_ADMIN
+      - SYS_ADMIN
+      - SYS_RESOURCE
+
+# LoadBalancer Service の IP を Cilium が払い出し、L2 (ARP) で広報する。
+# さくらのクラウドのルータ+スイッチは素の L2 セグメントなので ARP 広報で届く。
+l2announcements:
+  enabled: true
+externalIPs:
+  enabled: true
+
+# L2 announcement は leader election で kube-apiserver を叩くのでレートを緩める
+k8sClientRateLimit:
+  qps: 20
+  burst: 100
+
+operator:
+  replicas: 2
+  rollOutPods: true
+  prometheus:
+    enabled: true
+
+rollOutCiliumPods: true
+
+hubble:
+  relay:
+    enabled: true
+  ui:
+    enabled: true
+
+prometheus:
+  enabled: true

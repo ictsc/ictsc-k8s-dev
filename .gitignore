@@ -1,0 +1,13 @@
+.envrc
+.kube
+.terraform
+.terraform.tfstate*
+
+# Talos の生成物・秘密情報
+/talos/build/
+/talos/secrets.yaml
+/talos/talosconfig
+/talos/image/
+
+/.vscode/*
+!/.vscode/extensions.json

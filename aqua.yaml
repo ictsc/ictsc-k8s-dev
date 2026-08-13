@@ -1,0 +1,31 @@
+---
+# aqua - Declarative CLI Version Manager
+# https://aquaproj.github.io/
+registries:
+  - type: standard
+    ref: v4.551.0
+
+packages:
+  # Talos
+  # talos/scripts/fetch-image.sh が取ってくるイメージのバージョンと揃えること
+  # (Taskfile.yaml の TALOS_VERSION)
+  - name: siderolabs/talos@v1.13.8 # talosctl
+
+  # Terraform
+  # terraform-ictsc-net (CI が 1.13.2 固定) から tfstate を読ませるためバージョンを揃える
+  - name: hashicorp/terraform@v1.13.2
+  - name: terraform-linters/tflint@v0.64.0
+
+  # Kubernetes
+  # kubectl は terraform/vars.tf の kubernetes_version と揃えること
+  - name: kubernetes/kubernetes/kubectl@v1.36.3
+  # Helm 4 系は Argo CD の repo-server が内蔵する Helm と挙動が揃わないため v3 に固定
+  - name: helm/helm@v3.21.3
+
+  # タスクランナー・その他
+  - name: go-task/task@v3.52.0
+  - name: jqlang/jq@jq-1.8.2
+
+# aqua の標準レジストリに無いので brew などで別途入れるもの:
+#   - direnv  (シェルの hook を .zshrc に仕込む必要があり、リポジトリ単位の管理に馴染まない)
+#   - zstd    (talos/scripts/fetch-image.sh が Talos イメージの展開に使う)

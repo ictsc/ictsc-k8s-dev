@@ -1,0 +1,384 @@
+version: 3
+
+env:
+  TALOSCONFIG: '{{.ROOT_DIR}}/talos/talosconfig'
+  KUBECONFIG: '{{.ROOT_DIR}}/.kube/config'
+
+vars:
+  TALOS_VERSION: v1.13.8
+  TF_INPUT_JSON: '{{.ROOT_DIR}}/talos/build/talos-input.json'
+
+tasks:
+  ########################################
+  # 共通
+  ########################################
+  check-binary:
+    desc: 指定されたバイナリがインストールされているか確認
+    internal: true
+    silent: true
+    cmds:
+      - |
+        if ! (type {{.BINARY}} >/dev/null 2>&1); then
+          echo "下記公式ドキュメントを参考に{{if .ALT_NAME}}{{.ALT_NAME}}{{else}}{{.BINARY}}{{end}}をインストールした後、もう一度実行してください"
+          echo "{{.INSTALL_DOC}}"
+          exit 1
+        fi
+
+  ########################################
+  # 初期化
+  ########################################
+  init:
+    desc: ワークスペースを初期化
+    cmds:
+      - task: init-tools
+      - task: init-env
+      - task: init-terraform
+      - chmod +x talos/scripts/*.sh
+
+  init-tools:
+    desc: aqua で CLI を導入
+    internal: true
+    deps:
+      - task: check-binary
+        vars:
+          BINARY: aqua
+          INSTALL_DOC: https://aquaproj.github.io/docs/install
+    cmds:
+      - aqua install
+
+  init-env:
+    desc: 環境変数を初期化
+    internal: true
+    deps:
+      - task: check-binary
+        vars:
+          BINARY: direnv
+          INSTALL_DOC: https://github.com/direnv/direnv/blob/master/docs/installation.md
+    cmds:
+      - task: init-env-file
+      - direnv allow
+
+  init-env-file:
+    desc: .envrcを作成
+    internal: true
+    silent: true
+    vars:
+      SAKURACLOUD_ZONE: tk1b
+    status:
+      - test -f .envrc
+    cmds:
+      - |
+        echo "さくらクラウドのアクセストークンを入力してください"
+        read SAKURACLOUD_ACCESS_TOKEN
+        echo "さくらクラウドのアクセスシークレットを入力してください"
+        read SAKURACLOUD_ACCESS_TOKEN_SECRET
+        echo "tfstateを保存するバケットを選択してください (default: ictsc-void-k8s-dev)"
+        read TF_STATE_BUCKET
+        if [ -z "$TF_STATE_BUCKET" ]; then
+          TF_STATE_BUCKET=ictsc-void-k8s-dev
+        fi
+        echo "さくらのオブジェクトストレージのアクセスキーを入力してください"
+        read TF_STATE_ACCESS_KEY
+        echo "さくらのオブジェクトストレージのシークレットキーを入力してください"
+        read TF_STATE_SECRET_KEY
+        {
+          echo "export KUBECONFIG=./.kube/config";
+          echo "export TALOSCONFIG=./talos/talosconfig";
+          echo "";
+          echo "export SAKURACLOUD_ACCESS_TOKEN=$SAKURACLOUD_ACCESS_TOKEN";
+          echo "export SAKURACLOUD_ACCESS_TOKEN_SECRET=$SAKURACLOUD_ACCESS_TOKEN_SECRET";
+          echo "export SAKURACLOUD_ZONE={{.SAKURACLOUD_ZONE}}";
+          echo "";
+          echo "# tfstate 用 (さくらのオブジェクトストレージ)";
+          echo "export TF_STATE_BUCKET=$TF_STATE_BUCKET";
+          echo "export TF_CLI_ARGS_init=\"-backend-config=bucket=\$TF_STATE_BUCKET\"";
+          echo "export AWS_ACCESS_KEY_ID=$TF_STATE_ACCESS_KEY";
+          echo "export AWS_SECRET_ACCESS_KEY=$TF_STATE_SECRET_KEY";
+          echo "";
+          echo "# https://cloud.sakura.ad.jp/news/2025/02/04/objectstorage_defectversion/ のワークアラウンド"
+          echo "export AWS_REQUEST_CHECKSUM_CALCULATION=when_required";
+        } > .envrc
+        echo ".envrcを作成しました"
+
+  reset-env:
+    desc: 環境変数を再設定
+    cmds:
+      - rm -f .envrc
+      - task: init-env
+
+  init-terraform:
+    desc: Terraformの初期化
+    dir: terraform
+    deps:
+      - task: check-binary
+        vars:
+          BINARY: terraform
+          INSTALL_DOC: "aqua install で導入されます (aqua.yaml を参照)"
+    cmds:
+      - terraform init
+
+  ########################################
+  # ワークスペース
+  ########################################
+  show-ws:
+    desc: ワークスペースを表示
+    dir: terraform
+    cmds:
+      - terraform workspace show
+
+  select-dev:
+    desc: ワークスペースをdevに切り替え
+    cmds:
+      - cd terraform && terraform workspace select -or-create dev
+
+  select-prod:
+    desc: ワークスペースをprodに切り替え
+    cmds:
+      - cd terraform && terraform workspace select -or-create prod
+
+  ########################################
+  # Terraform / Talos
+  ########################################
+  fetch-talos-image:
+    desc: Talos の nocloud イメージを取得
+    cmds:
+      - TALOS_VERSION={{.TALOS_VERSION}} ./talos/scripts/fetch-image.sh
+
+  apply-network:
+    desc: グローバルIPを確定させるためネットワークだけ先に作る
+    internal: true
+    dir: terraform
+    cmds:
+      - terraform apply -auto-approve -target=sakura_internet.k8s_external -target=sakura_vswitch.k8s_internal
+
+  talos-config:
+    desc: Terraformの出力から Talos の machine config と cidata ISO を生成
+    deps:
+      - task: check-binary
+        vars:
+          BINARY: talosctl
+          INSTALL_DOC: "aqua install で導入されます (aqua.yaml を参照)"
+      - task: check-binary
+        vars:
+          BINARY: jq
+          INSTALL_DOC: "aqua install で導入されます (aqua.yaml を参照)"
+    cmds:
+      - mkdir -p talos/build
+      - cd terraform && terraform output -json talos_input > {{.TF_INPUT_JSON}}
+      - ./talos/scripts/gen-config.sh {{.TF_INPUT_JSON}}
+
+  lint-terraform:
+    desc: TerraformのLintを実行
+    internal: true
+    dir: terraform
+    deps:
+      - task: check-binary
+        vars:
+          BINARY: tflint
+          INSTALL_DOC: "aqua install で導入されます (aqua.yaml を参照)"
+    cmds:
+      - tflint
+
+  format-terraform:
+    desc: Terraformのフォーマットを実行
+    dir: terraform
+    cmds:
+      - terraform fmt
+
+  apply-terraform:
+    desc: Terraformを実行
+    internal: true
+    dir: terraform
+    cmds:
+      - terraform apply -auto-approve
+
+  apply:
+    desc: インフラを構築 (イメージ取得 -> ネットワーク -> Talos設定生成 -> 全体apply)
+    deps:
+      - show-ws
+      - format-terraform
+      - lint-terraform
+    cmds:
+      - task: fetch-talos-image
+      - task: apply-network
+      - task: talos-config
+      - task: apply-terraform
+
+  destroy:
+    desc: 全てのリソースを削除
+    dir: terraform
+    cmds:
+      - terraform destroy
+
+  ########################################
+  # クラスタのブートストラップ
+  ########################################
+  talos-bootstrap:
+    desc: etcd を初期化してクラスタを立ち上げる (初回のみ)
+    deps:
+      - task: check-binary
+        vars:
+          BINARY: talosctl
+          INSTALL_DOC: "aqua install で導入されます (aqua.yaml を参照)"
+    cmds:
+      - |
+        CP1=$(cd terraform && terraform output -json control_plane_ips | jq -r '.[0]')
+        echo "==> ${CP1} で talosctl bootstrap を実行 (Talos の起動を待つので数分かかります)"
+        until talosctl -n "${CP1}" -e "${CP1}" version --short >/dev/null 2>&1; do sleep 10; done
+        talosctl -n "${CP1}" -e "${CP1}" bootstrap || true
+
+        # ここで talosctl health を回してはいけない。
+        # health は「全 k8s ノードが Ready」「全 Pod が Running」まで見るが、
+        # CNI は task bootstrap-cluster で後入れするため、この時点では絶対に満たされず
+        # --wait-timeout ぶん丸ごと待たされる。健全性の確認は task health で CNI 投入後に行う。
+        echo "==> etcd が Running になるのを待つ"
+        until talosctl -n "${CP1}" -e "${CP1}" service etcd 2>/dev/null | grep -qE '^STATE +Running'; do sleep 10; done
+        echo "==> etcd OK"
+
+  kubeconfig:
+    desc: kubeconfigを取得
+    cmds:
+      - mkdir -p .kube
+      - |
+        CP1=$(cd terraform && terraform output -json control_plane_ips | jq -r '.[0]')
+        talosctl -n "${CP1}" -e "${CP1}" kubeconfig ./.kube/config --force
+      - kubectl config rename-context "$(kubectl config current-context)" "$(cd terraform && terraform workspace show)" || true
+
+  hosts:
+    desc: /etc/hosts に貼る行を表示 (DNS を使わずに動作確認したいとき用)
+    silent: true
+    dir: terraform
+    cmds:
+      - terraform output -raw hosts_entries
+      - echo
+
+  render-env-values:
+    desc: terraform output から env 固有の値 (VIP・ドメイン) をマニフェストに反映
+    vars:
+      ENV: { sh: 'cd terraform && terraform workspace show' }
+    cmds:
+      - |
+        set -eu
+        cd terraform
+        ENV=$(terraform workspace show)
+        INGRESS_VIP=$(terraform output -raw ingress_vip)
+        DOMAIN=$(terraform output -raw domain)
+        CLUSTER=$(terraform output -json talos_input | jq -r '.cluster_name')
+        cd ..
+        d="manifest/envs/${ENV}"
+
+        cat > "${d}/values/cilium.yaml" <<EOF
+        # このファイルは \`task render-env-values\` が terraform output から生成する
+        cluster:
+          name: ${CLUSTER}
+          id: $([ "${ENV}" = "prod" ] && echo 2 || echo 1)
+        EOF
+
+        cat > "${d}/values/argocd.yaml" <<EOF
+        # このファイルは \`task render-env-values\` が terraform output から生成する
+        global:
+          domain: argocd.${DOMAIN}
+
+        configs:
+          params:
+            server.insecure: false
+
+        server:
+          service:
+            type: LoadBalancer
+            annotations:
+              # Cilium LB IPAM に Ingress VIP を割り当てさせる
+              lbipam.cilium.io/ips: "${INGRESS_VIP}"
+        EOF
+
+        cat > "${d}/resources/cilium-lb-ip-pool.yaml" <<EOF
+        # LoadBalancer Service に払い出すグローバルIPのプール
+        # このファイルは \`task render-env-values\` が terraform output から生成する
+        apiVersion: cilium.io/v2
+        kind: CiliumLoadBalancerIPPool
+        metadata:
+          name: external
+          annotations:
+            argocd.argoproj.io/sync-wave: "-25"
+        spec:
+          blocks:
+            - start: ${INGRESS_VIP}
+              stop: ${INGRESS_VIP}
+        EOF
+
+        echo "==> ${d} を更新しました。git に commit / push してから Argo CD に同期させてください"
+
+  bootstrap-cluster:
+    desc: CNI (Cilium) と Argo CD を入れて GitOps を開始する
+    deps:
+      - task: check-binary
+        vars:
+          BINARY: helm
+          INSTALL_DOC: "aqua install で導入されます (aqua.yaml を参照)"
+    vars:
+      ENV: { sh: 'cd terraform && terraform workspace show' }
+    cmds:
+      # Argo CD が動くには CNI が要るので、Cilium と Argo CD だけ helm で先に入れる。
+      # 以降は Argo CD が同じ values を読んで自分ごと管理する。
+      - helm repo add cilium https://helm.cilium.io/
+      - helm repo add argo https://argoproj.github.io/argo-helm
+      - helm repo update cilium argo
+      - >-
+        helm upgrade --install cilium cilium/cilium --version 1.20.0
+        --namespace kube-system
+        -f manifest/base/cilium/values.yaml
+        -f manifest/envs/{{.ENV}}/values/cilium.yaml
+        --wait --timeout 10m
+      - kubectl -n kube-system rollout status deploy/coredns --timeout=10m
+      - kubectl apply -f manifest/envs/{{.ENV}}/resources/
+      - >-
+        helm upgrade --install argocd argo/argo-cd --version 10.2.3
+        --namespace argocd --create-namespace
+        -f manifest/base/argocd/values.yaml
+        -f manifest/envs/{{.ENV}}/values/argocd.yaml
+        --wait --timeout 10m
+      - kubectl apply -f manifest/root-{{.ENV}}.yaml
+
+  health:
+    desc: クラスタの健全性を確認 (CNI 投入後に実行すること)
+    deps:
+      - task: check-binary
+        vars:
+          BINARY: talosctl
+          INSTALL_DOC: "aqua install で導入されます (aqua.yaml を参照)"
+    cmds:
+      # talosctl health は指定したノード構成を「期待値」として突き合わせるので、
+      # control plane / worker を明示しないと "unexpected nodes" と言われる。
+      #
+      # ここで渡すのは内部 IP。etcd の advertisedSubnets も kubelet の
+      # nodeIP.validSubnets も内部セグメントに揃えてある (gen-config.sh 参照) ので、
+      # グローバル IP を渡すと "etcd member ips are not subset of
+      # control plane node ips" で落ちる。
+      # -e (endpoint) だけはグローバル IP。apid が内部 IP へ中継してくれる。
+      - |
+        cd terraform
+        EP=$(terraform output -json control_plane_ips | jq -r '.[0]')
+        CP=$(terraform output -json talos_input \
+          | jq -r '[.nodes[] | select(.role == "controlplane") | .internal_ip] | join(",")')
+        WK=$(terraform output -json talos_input \
+          | jq -r '[.nodes[] | select(.role == "worker") | .internal_ip] | join(",")')
+        cd ..
+        talosctl -n "${CP%%,*}" -e "${EP}" health \
+          --control-plane-nodes "${CP}" \
+          --worker-nodes "${WK}" \
+          --wait-timeout 10m
+
+  argocd-password:
+    desc: Argo CD の初期 admin パスワードを表示
+    cmds:
+      - kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath='{.data.password}' | base64 -d && echo
+
+  up:
+    desc: ゼロからクラスタが立ち上がるまで一気にやる
+    cmds:
+      - task: apply
+      - task: talos-bootstrap
+      - task: kubeconfig
+      - task: render-env-values
+      - task: bootstrap-cluster
+      - task: health

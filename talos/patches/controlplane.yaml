@@ -1,0 +1,16 @@
+# control plane 専用の machine config パッチ
+cluster:
+  allowSchedulingOnControlPlanes: false
+  apiServer:
+    extraArgs:
+      # metrics-server / kubelet の serving cert 検証用
+      kubelet-preferred-address-types: InternalIP,Hostname,ExternalIP
+  controllerManager:
+    extraArgs:
+      bind-address: 0.0.0.0
+  scheduler:
+    extraArgs:
+      bind-address: 0.0.0.0
+  etcd:
+    extraArgs:
+      listen-metrics-urls: http://0.0.0.0:2381

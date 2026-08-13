@@ -1,0 +1,9 @@
+replicas: 2
+
+args:
+  # Talos の kubelet は rotate-server-certificates: true にしてあるので
+  # --kubelet-insecure-tls は不要
+  - --kubelet-preferred-address-types=InternalIP,Hostname,ExternalIP
+
+apiService:
+  create: true

@@ -1,0 +1,7 @@
+resources:
+  - ./cilium.yaml
+  - ./kubelet-serving-cert-approver.yaml
+  - ./metrics-server.yaml
+  - ./argocd.yaml
+  - ./resources/cilium-lb-ip-pool.yaml
+  - ./resources/cilium-l2-announcement.yaml
