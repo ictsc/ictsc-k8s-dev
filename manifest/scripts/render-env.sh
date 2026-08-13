@@ -44,6 +44,18 @@ global:
   domain: argocd.${domain}
 
 configs:
+  cm:
+    # clientSecret は argocd-oidc Secret から読む (Git には置かない)
+    oidc.config: |
+      name: Dex
+      issuer: https://dex.${domain}
+      clientID: argocd
+      clientSecret: \$argocd-oidc:clientSecret
+      requestedScopes:
+        - openid
+        - profile
+        - email
+        - groups
   params:
     # false だと Gateway からの平文リクエストに 307 を返し続けてループする
     server.insecure: true
@@ -101,6 +113,11 @@ config:
       # 保護対象アプリを増やしたらここに <host>/oauth2/callback を足す
       redirectURIs:
         - https://httpbin.${domain}/oauth2/callback
+    - id: argocd
+      name: Argo CD
+      secretEnv: ARGOCD_CLIENT_SECRET
+      redirectURIs:
+        - https://argocd.${domain}/auth/callback
 EOF
 
 ########################################

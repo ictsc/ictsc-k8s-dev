@@ -19,7 +19,7 @@ spec:
         valueFiles:
           - $values/manifest/base/dex/values.yaml
           - $values/manifest/envs/prod/values/dex.yaml
-    - repoURL: https://github.com/ictsc/ictsc-k8s-dev.git
+    - repoURL: git@github.com:ictsc/ictsc-k8s-dev.git
       targetRevision: main
       ref: values
   destination:

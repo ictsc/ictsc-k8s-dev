@@ -10,7 +10,7 @@ metadata:
 spec:
   project: default
   source:
-    repoURL: https://github.com/ictsc/ictsc-k8s-dev.git
+    repoURL: git@github.com:ictsc/ictsc-k8s-dev.git
     targetRevision: main
     path: manifest/base/httpbin
   destination:

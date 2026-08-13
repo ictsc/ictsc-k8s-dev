@@ -29,3 +29,8 @@ config:
       # 保護対象アプリを増やしたらここに <host>/oauth2/callback を足す
       redirectURIs:
         - https://httpbin.k8s.ictsc.net/oauth2/callback
+    - id: argocd
+      name: Argo CD
+      secretEnv: ARGOCD_CLIENT_SECRET
+      redirectURIs:
+        - https://argocd.k8s.ictsc.net/auth/callback

@@ -18,7 +18,7 @@ spec:
         valueFiles:
           - $values/manifest/base/cilium/values.yaml
           - $values/manifest/envs/dev/values/cilium.yaml
-    - repoURL: https://github.com/ictsc/ictsc-k8s-dev.git
+    - repoURL: git@github.com:ictsc/ictsc-k8s-dev.git
       targetRevision: main
       ref: values
   destination:

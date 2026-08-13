@@ -18,7 +18,7 @@ spec:
         valueFiles:
           - $values/manifest/base/oauth2-proxy/values.yaml
           - $values/manifest/envs/dev/values/oauth2-proxy.yaml
-    - repoURL: https://github.com/ictsc/ictsc-k8s-dev.git
+    - repoURL: git@github.com:ictsc/ictsc-k8s-dev.git
       targetRevision: main
       ref: values
   destination:

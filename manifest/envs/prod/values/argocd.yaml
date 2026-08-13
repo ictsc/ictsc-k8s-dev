@@ -3,6 +3,18 @@ global:
   domain: argocd.k8s.ictsc.net
 
 configs:
+  cm:
+    # clientSecret は argocd-oidc Secret から読む (Git には置かない)
+    oidc.config: |
+      name: Dex
+      issuer: https://dex.k8s.ictsc.net
+      clientID: argocd
+      clientSecret: $argocd-oidc:clientSecret
+      requestedScopes:
+        - openid
+        - profile
+        - email
+        - groups
   params:
     # false だと Gateway からの平文リクエストに 307 を返し続けてループする
     server.insecure: true

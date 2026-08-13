@@ -22,6 +22,11 @@ envVars:
       secretKeyRef:
         name: dex-secrets
         key: oauth2-proxy-client-secret
+  - name: ARGOCD_CLIENT_SECRET
+    valueFrom:
+      secretKeyRef:
+        name: dex-secrets
+        key: argocd-client-secret
 
 # 公開は Gateway API の HTTPRoute で行うため Ingress は使わない
 ingress:

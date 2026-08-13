@@ -18,7 +18,7 @@ spec:
         releaseName: cert-manager
         valueFiles:
           - $values/manifest/base/cert-manager/values.yaml
-    - repoURL: https://github.com/ictsc/ictsc-k8s-dev.git
+    - repoURL: git@github.com:ictsc/ictsc-k8s-dev.git
       targetRevision: main
       ref: values
   destination:

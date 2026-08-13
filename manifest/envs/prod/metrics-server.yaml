@@ -17,7 +17,7 @@ spec:
         releaseName: metrics-server
         valueFiles:
           - $values/manifest/base/metrics-server/values.yaml
-    - repoURL: https://github.com/ictsc/ictsc-k8s-dev.git
+    - repoURL: git@github.com:ictsc/ictsc-k8s-dev.git
       targetRevision: main
       ref: values
   destination:
