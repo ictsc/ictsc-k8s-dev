@@ -1,0 +1,7 @@
+# このファイルは `task render-env-values` が terraform output から生成する
+extraArgs:
+  oidc-issuer-url: https://dex.k8s.ictsc.net
+  # redirect-url は固定しない。oauth2-proxy は戻り先を相対パスでしか保持せず、
+  # callback を別ホストに置くとログイン後に元のアプリへ戻れない
+  cookie-domain: .k8s.ictsc.net
+  whitelist-domain: .k8s.ictsc.net

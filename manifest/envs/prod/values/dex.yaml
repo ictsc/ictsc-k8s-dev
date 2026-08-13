@@ -1,0 +1,31 @@
+# このファイルは `task render-env-values` が terraform output から生成する
+config:
+  issuer: https://dex.k8s.ictsc.net
+
+  storage:
+    type: kubernetes
+    config:
+      inCluster: true
+
+  oauth2:
+    skipApprovalScreen: true
+
+  connectors:
+    - type: github
+      id: github
+      name: GitHub
+      config:
+        clientID: $GITHUB_CLIENT_ID
+        clientSecret: $GITHUB_CLIENT_SECRET
+        redirectURI: https://dex.k8s.ictsc.net/callback
+        # ここを通過できる GitHub organization
+        orgs:
+          - name: ictsc
+
+  staticClients:
+    - id: oauth2-proxy
+      name: oauth2-proxy
+      secretEnv: OAUTH2_PROXY_CLIENT_SECRET
+      # 保護対象アプリを増やしたらここに <host>/oauth2/callback を足す
+      redirectURIs:
+        - https://httpbin.k8s.ictsc.net/oauth2/callback

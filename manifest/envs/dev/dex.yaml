@@ -1,0 +1,34 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: dex
+  namespace: argocd
+  annotations:
+    # oauth2-proxy が起動時に issuer の discovery を叩くので先に立てる
+    argocd.argoproj.io/sync-wave: "-5"
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  sources:
+    - repoURL: https://charts.dexidp.io
+      chart: dex
+      targetRevision: 0.24.1
+      helm:
+        releaseName: dex
+        valueFiles:
+          - $values/manifest/base/dex/values.yaml
+          - $values/manifest/envs/dev/values/dex.yaml
+    - repoURL: https://github.com/ictsc/ictsc-k8s-dev.git
+      targetRevision: main
+      ref: values
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: dex
+  syncPolicy:
+    syncOptions:
+      - ServerSideApply=true
+      - CreateNamespace=true
+    automated:
+      prune: true
+      selfHeal: true

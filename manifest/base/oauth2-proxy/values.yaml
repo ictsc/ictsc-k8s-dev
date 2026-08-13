@@ -1,0 +1,29 @@
+# Cilium Gateway API の ExternalAuth フィルタから呼ばれる認可サーバ。
+# 認証は Dex に委譲し、org 判定も Dex 側で行う。
+#
+# 認証情報は Git に置かない。oidc Secret を手で作ること (README 参照)。
+
+config:
+  existingSecret: oidc
+
+extraArgs:
+  provider: oidc
+  # Envoy の ext_authz は 200 ちょうどしか許可扱いにしない。
+  # 既定の 202 を返すと認証済みでも拒否され、この応答の本文がそのまま
+  # クライアントに表示されてしまう。
+  upstream: static://200
+  reverse-proxy: "true"
+  # サインイン画面を挟むと CSS (/oauth2/static/...) も ExternalAuth に捕まり
+  # スタイルの当たらないページになるため、Dex へ直接 302 する
+  skip-provider-button: "true"
+  set-xauthrequest: "true"
+  email-domain: "*"
+
+replicaCount: 2
+
+metrics:
+  enabled: true
+
+# 公開は Gateway API の HTTPRoute で行うため Ingress は使わない
+ingress:
+  enabled: false

@@ -1,0 +1,22 @@
+crds:
+  enabled: true
+
+replicaCount: 2
+
+# HTTP-01 チャレンジを Gateway API の HTTPRoute で解かせる。
+# cert-manager は既存の Gateway を書き換えず、チャレンジ中だけ一時的な HTTPRoute を
+# 生やして .well-known/acme-challenge を自分に向ける。
+#
+# ExperimentalGatewayAPISupport は v1.21 では BETA / 既定 true なので
+# featureGates の明示は不要。この config だけで足りる。
+config:
+  apiVersion: controller.config.cert-manager.io/v1alpha1
+  kind: ControllerConfiguration
+  gatewayAPI:
+    enabled: true
+
+webhook:
+  replicaCount: 2
+
+cainjector:
+  replicaCount: 2

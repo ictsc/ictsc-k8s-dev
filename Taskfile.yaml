@@ -7,6 +7,11 @@ env:
 vars:
   TALOS_VERSION: v1.13.8
   TF_INPUT_JSON: '{{.ROOT_DIR}}/talos/build/talos-input.json'
+  # Gateway API の CRD。ExternalAuth フィルタ (GEP-1494) を使うので
+  # standard ではなく experimental チャネルを入れる必要がある。
+  GATEWAY_API_VERSION: v1.6.1
+  # Let's Encrypt の失効通知などが飛ぶ宛先
+  ACME_EMAIL: '{{.ACME_EMAIL | default "TODO-set-me@ictsc.net"}}'
 
 tasks:
   ########################################
@@ -254,8 +259,6 @@ tasks:
 
   render-env-values:
     desc: terraform output から env 固有の値 (VIP・ドメイン) をマニフェストに反映
-    vars:
-      ENV: { sh: 'cd terraform && terraform workspace show' }
     cmds:
       - |
         set -eu
@@ -265,48 +268,17 @@ tasks:
         DOMAIN=$(terraform output -raw domain)
         CLUSTER=$(terraform output -json talos_input | jq -r '.cluster_name')
         cd ..
-        d="manifest/envs/${ENV}"
-
-        cat > "${d}/values/cilium.yaml" <<EOF
-        # このファイルは \`task render-env-values\` が terraform output から生成する
-        cluster:
-          name: ${CLUSTER}
-          id: $([ "${ENV}" = "prod" ] && echo 2 || echo 1)
-        EOF
-
-        cat > "${d}/values/argocd.yaml" <<EOF
-        # このファイルは \`task render-env-values\` が terraform output から生成する
-        global:
-          domain: argocd.${DOMAIN}
-
-        configs:
-          params:
-            server.insecure: false
-
-        server:
-          service:
-            type: LoadBalancer
-            annotations:
-              # Cilium LB IPAM に Ingress VIP を割り当てさせる
-              lbipam.cilium.io/ips: "${INGRESS_VIP}"
-        EOF
-
-        cat > "${d}/resources/cilium-lb-ip-pool.yaml" <<EOF
-        # LoadBalancer Service に払い出すグローバルIPのプール
-        # このファイルは \`task render-env-values\` が terraform output から生成する
-        apiVersion: cilium.io/v2
-        kind: CiliumLoadBalancerIPPool
-        metadata:
-          name: external
-          annotations:
-            argocd.argoproj.io/sync-wave: "-25"
-        spec:
-          blocks:
-            - start: ${INGRESS_VIP}
-              stop: ${INGRESS_VIP}
-        EOF
-
-        echo "==> ${d} を更新しました。git に commit / push してから Argo CD に同期させてください"
+        ./manifest/scripts/render-env.sh \
+          "${ENV}" "${CLUSTER}" "${DOMAIN}" "${INGRESS_VIP}" '{{.ACME_EMAIL}}'
+  install-gateway-api-crds:
+    desc: Gateway API の CRD (experimental チャネル) を導入
+    cmds:
+      # standard ではなく experimental チャネルを入れる。
+      # HTTPRoute の ExternalAuth フィルタ (GEP-1494) は standard の CRD には
+      # 含まれておらず、認証を持たないアプリを oauth2-proxy で守るのに必要。
+      - >-
+        kubectl apply --server-side
+        -f https://github.com/kubernetes-sigs/gateway-api/releases/download/{{.GATEWAY_API_VERSION}}/experimental-install.yaml
 
   bootstrap-cluster:
     desc: CNI (Cilium) と Argo CD を入れて GitOps を開始する
@@ -318,6 +290,9 @@ tasks:
     vars:
       ENV: { sh: 'cd terraform && terraform workspace show' }
     cmds:
+      # Cilium は gatewayAPI.enabled=true のとき起動時に Gateway API の CRD を見に行く。
+      # 無いと Gateway のサポートを諦めるので、必ず Cilium より先に入れる。
+      - task: install-gateway-api-crds
       # Argo CD が動くには CNI が要るので、Cilium と Argo CD だけ helm で先に入れる。
       # 以降は Argo CD が同じ values を読んで自分ごと管理する。
       - helm repo add cilium https://helm.cilium.io/

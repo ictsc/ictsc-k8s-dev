@@ -12,6 +12,9 @@ ictsc-k8s-dev/
 ├── terraform/  (さくらのクラウドのリソース定義。provider は sacloud/sakura)
 ├── talos/      (Talos の machine config パッチと生成スクリプト)
 ├── manifest/   (Kubernetes マニフェスト。Argo CD の app-of-apps)
+│   ├── base/     (env 共通の Helm values)
+│   ├── envs/     (env ごとの Application と生成物。手で編集しない)
+│   └── scripts/  (envs/ を terraform output から生成する)
 │
 ├── aqua.yaml     (CLI のバージョン固定)
 └── Taskfile.yaml (タスク定義)
@@ -23,6 +26,8 @@ ictsc-k8s-dev/
 - **Kubernetes**: `v1.36.3` / CNI は Cilium (kube-proxy 置き換え)
 - **IaC**: Terraform (`sacloud/sakura` v3.12.7) + Terraform workspace で `dev` / `prod` を分離
 - **GitOps**: Argo CD (app-of-apps)
+- **入口**: Cilium Gateway API + cert-manager (Let's Encrypt / HTTP-01)
+- **認証**: Dex (GitHub) + oauth2-proxy を Gateway API の ExternalAuth で前段に置く
 - **ノードのスペック**: 全ノード 2コア / 4GB / ディスク 40GB (`terraform/vars.tf`)
   - 使えるサーバスペックの上限が **2コア / 4GB** なので、これ以上は盛れない。
     足りない場合は台数 (`control_plane` / `worker_node`) を増やす方向で対応する
@@ -242,6 +247,43 @@ $ cd terraform && terraform output -raw hosts_entries | sudo tee -a /etc/hosts
 ノード名 (`ictsc-dev-cp-1` など) は DNS には登録していないので、
 そちらを名前で引きたい場合は `/etc/hosts` を使う。
 
+## 認証 (Dex + oauth2-proxy)
+
+認証を持たないアプリの前段に oauth2-proxy を置き、Cilium Gateway API の
+`ExternalAuth` フィルタ (GEP-1494) から認可を問い合わせる。GitHub とのやり取りは
+Dex に集約しているので、**GitHub 側に登録する callback は Dex の1本だけ**。
+
+```plain
+GitHub App --(callback: dex.<domain>/callback)--> Dex --OIDC--> oauth2-proxy
+                                                                    |
+                                              ExternalAuth (ext_authz) で問い合わせ
+                                                                    v
+                                                              保護対象アプリ
+```
+
+### 保護対象アプリを増やす
+
+`task render-env-values` が生成するファイルなので、`manifest/scripts/render-env.sh`
+を編集してから再生成すること。GitHub 側の作業は不要。
+
+1. `values/dex.yaml` の `staticClients[].redirectURIs` に `https://<host>/oauth2/callback`
+2. `resources/gateway.yaml` の Certificate `dnsNames` に `<host>`
+3. `resources/httproutes.yaml` に HTTPRoute を追加
+   - `/oauth2` は oauth2-proxy へ素通し (ここを保護すると OAuth が完了できない)
+   - それ以外に `ExternalAuth` フィルタを付けて実体へ流す
+   - `sync-wave` は oauth2-proxy より後 (下記の注意を参照)
+
+> [!WARNING]
+> 認可バックエンドの Service が存在しない状態で `ExternalAuth` 付きの HTTPRoute が
+> 生えると、Cilium は ext_authz フィルタを組まず**認証なしで素通しする**。
+> `ResolvedRefs=False` はステータスに出るがトラフィックは止まらない。
+> 保護対象の HTTPRoute には必ず oauth2-proxy より後の `sync-wave` を付けること。
+
+> [!NOTE]
+> oauth2-proxy はログイン後の戻り先を相対パスでしか保持しないため、callback は
+> **保護対象ホスト自身**に置く必要がある。別ホスト (auth.<domain> など) に集約すると
+> ログイン後に元のアプリへ戻れない。
+
 ## 秘密情報
 
 - `.envrc` — さくらのクラウドの API キーなど (gitignore 済み / direnv が読む)
@@ -249,11 +291,32 @@ $ cd terraform && terraform output -raw hosts_entries | sudo tee -a /etc/hosts
   必ずどこかにバックアップすること (gitignore 済み)
 - `talos/talosconfig` — talosctl のクライアント証明書 (gitignore 済み)
 
+Secret は Git に置かないので、クラスタに直接作る (Argo CD の管理外)。
+
+```console
+$ O2P_SECRET=$(openssl rand -base64 32 | tr -- '+/' '-_')
+
+# Dex: GitHub App の認証情報 + oauth2-proxy と共有するクライアントシークレット
+$ kubectl create namespace dex
+$ kubectl -n dex create secret generic dex-secrets \
+    --from-literal=github-client-id='<GitHub App の Client ID>' \
+    --from-literal=github-client-secret='<GitHub App の Client secret>' \
+    --from-literal=oauth2-proxy-client-secret="${O2P_SECRET}"
+
+# oauth2-proxy: Dex の staticClient として振る舞うための認証情報
+$ kubectl create namespace oauth2-proxy
+$ kubectl -n oauth2-proxy create secret generic oidc \
+    --from-literal=client-id=oauth2-proxy \
+    --from-literal=client-secret="${O2P_SECRET}" \
+    --from-literal=cookie-secret="$(openssl rand -base64 32 | tr -- '+/' '-_')"
+```
+
 ## まだやってないこと
 
 - ノード名の DNS 登録 (VIP は Cloudflare に登録済み。ノードは `/etc/hosts` 運用)
 - IPv6 (`enable_ipv6 = false`。drove は dual stack)
 - ストレージ (Rook/Ceph)
-- Ingress Controller / cert-manager / 監視スタック
-- OIDC 認証 (dex + kubelogin)
+- 監視スタック
+- kubelogin (kubectl の OIDC 認証。Dex は導入済み)
+- Secret の Git 管理 (SOPS / sealed-secrets)
 - CI (terraform fmt / tflint / helm lint)

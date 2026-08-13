@@ -1,0 +1,28 @@
+# GitHub と各アプリの間に挟む OIDC プロバイダ。GitHub に登録する callback は
+# Dex の1本で固定になり、アプリ追加時は envs/<env>/values/dex.yaml の
+# staticClients に redirectURI を足すだけで済む。
+#
+# 認証情報は Git に置かない。dex-secrets を手で作ること (README 参照)。
+
+replicaCount: 2
+
+envVars:
+  - name: GITHUB_CLIENT_ID
+    valueFrom:
+      secretKeyRef:
+        name: dex-secrets
+        key: github-client-id
+  - name: GITHUB_CLIENT_SECRET
+    valueFrom:
+      secretKeyRef:
+        name: dex-secrets
+        key: github-client-secret
+  - name: OAUTH2_PROXY_CLIENT_SECRET
+    valueFrom:
+      secretKeyRef:
+        name: dex-secrets
+        key: oauth2-proxy-client-secret
+
+# 公開は Gateway API の HTTPRoute で行うため Ingress は使わない
+ingress:
+  enabled: false
