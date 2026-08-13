@@ -113,6 +113,7 @@ $ aqua install
 | `tflint` | v0.64.0 | |
 | `kubectl` | v1.36.3 | `terraform/vars.tf` の `kubernetes_version` と揃える |
 | `helm` | v3.21.3 | Argo CD の repo-server が内蔵する Helm に合わせて v3 系に固定 |
+| `gh` | v2.97.0 | `task argocd-repo-key` が deploy key の登録に使う。`gh auth login` 済みであること |
 | `task` | v3.52.0 | |
 | `jq` | 1.8.2 | |
 
@@ -185,8 +186,22 @@ $ task up
 | `task talos-bootstrap` | `talosctl bootstrap` で etcd を初期化 |
 | `task kubeconfig` | kubeconfig を `.kube/config` に取得 |
 | `task render-env-values` | terraform output を manifest の env 固有値に反映 |
-| `task bootstrap-cluster` | Cilium と Argo CD を helm で入れて app-of-apps を適用 |
+| `task bootstrap-cluster` | Cilium と Argo CD を helm で入れる |
+| `task argocd-repo-key` | deploy key を作って GitHub に登録し、Argo CD に持たせる |
+| `task auth-secrets` | Dex / oauth2-proxy / Argo CD の OIDC 用 Secret を作る |
+| `task start-gitops` | app-of-apps のルートを適用して Argo CD に引き継ぐ |
 | `task health` | `talosctl health` でクラスタの健全性を確認 |
+
+`task up` の途中で **GitHub App (または OAuth App) の Client ID / secret を聞かれる**。
+先に用意しておくこと (「認証 (Dex + oauth2-proxy)」を参照)。
+`argocd-repo-key` は `gh` で deploy key を登録するので、リポジトリの admin 権限が要る。
+どちらも作成済みなら status 判定でスキップされる。
+
+> [!NOTE]
+> `manifest/envs/<env>/resources/` は `bootstrap-cluster` では撒かない。
+> ClusterIssuer や Certificate は cert-manager の CRD を必要とし、ExternalAuth 付きの
+> HTTPRoute は oauth2-proxy より後でなければならないため、順序は Argo CD の
+> sync-wave に任せている。
 
 > [!NOTE]
 > `talosctl health` は「全 k8s ノードが Ready」「全 Pod が Running」まで待つ。
@@ -292,24 +307,12 @@ GitHub App --(callback: dex.<domain>/callback)--> Dex --OIDC--> oauth2-proxy
 - `talos/talosconfig` — talosctl のクライアント証明書 (gitignore 済み)
 
 Secret は Git に置かないので、クラスタに直接作る (Argo CD の管理外)。
+`task up` が下記を呼ぶので、通常は手で作る必要はない。
 
-```console
-$ O2P_SECRET=$(openssl rand -base64 32 | tr -- '+/' '-_')
-
-# Dex: GitHub App の認証情報 + oauth2-proxy と共有するクライアントシークレット
-$ kubectl create namespace dex
-$ kubectl -n dex create secret generic dex-secrets \
-    --from-literal=github-client-id='<GitHub App の Client ID>' \
-    --from-literal=github-client-secret='<GitHub App の Client secret>' \
-    --from-literal=oauth2-proxy-client-secret="${O2P_SECRET}"
-
-# oauth2-proxy: Dex の staticClient として振る舞うための認証情報
-$ kubectl create namespace oauth2-proxy
-$ kubectl -n oauth2-proxy create secret generic oidc \
-    --from-literal=client-id=oauth2-proxy \
-    --from-literal=client-secret="${O2P_SECRET}" \
-    --from-literal=cookie-secret="$(openssl rand -base64 32 | tr -- '+/' '-_')"
-```
+| task | 作る Secret |
+| --- | --- |
+| `task auth-secrets` | `dex/dex-secrets` `oauth2-proxy/oidc` `argocd/argocd-oidc` |
+| `task argocd-repo-key` | `argocd/repo-<repo>` (deploy key。GitHub 側にも登録する) |
 
 ## まだやってないこと
 

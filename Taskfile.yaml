@@ -306,13 +306,99 @@ tasks:
         -f manifest/envs/{{.ENV}}/values/cilium.yaml
         --wait --timeout 10m
       - kubectl -n kube-system rollout status deploy/coredns --timeout=10m
-      - kubectl apply -f manifest/envs/{{.ENV}}/resources/
+      # envs/<env>/resources/ はここで撒かない。ClusterIssuer や Certificate は
+      # cert-manager の CRD を必要とし、ExternalAuth 付きの HTTPRoute は
+      # oauth2-proxy より後でなければならない。順序は Argo CD の sync-wave に任せる。
       - >-
         helm upgrade --install argocd argo/argo-cd --version 10.2.3
         --namespace argocd --create-namespace
         -f manifest/base/argocd/values.yaml
         -f manifest/envs/{{.ENV}}/values/argocd.yaml
         --wait --timeout 10m
+
+  argocd-repo-key:
+    desc: Argo CD が private リポジトリを読むための deploy key を作って GitHub に登録
+    deps:
+      - task: check-binary
+        vars:
+          BINARY: gh
+          INSTALL_DOC: https://cli.github.com/
+    status:
+      # Secret があれば作成済みとみなす
+      - kubectl -n argocd get secret repo-{{.REPO_NAME}} >/dev/null 2>&1
+    vars:
+      REPO: { sh: 'git remote get-url origin | sed "s|.*[:/]\([^/]*/[^/]*\)\.git|\1|"' }
+      REPO_NAME: { sh: 'basename "$(git remote get-url origin)" .git' }
+    cmds:
+      - |
+        set -eu
+        tmp=$(mktemp -d)
+        trap 'rm -rf "${tmp}"' EXIT
+        ssh-keygen -t ed25519 -N "" -C "argocd@{{.REPO_NAME}}" -f "${tmp}/key" >/dev/null
+
+        kubectl create namespace argocd --dry-run=client -o yaml | kubectl apply -f - >/dev/null
+        kubectl -n argocd create secret generic repo-{{.REPO_NAME}} \
+          --from-literal=type=git \
+          --from-literal=url="$(git remote get-url origin)" \
+          --from-file=sshPrivateKey="${tmp}/key" \
+          --dry-run=client -o yaml \
+          | kubectl label -f - --local -o yaml argocd.argoproj.io/secret-type=repository \
+          | kubectl apply -f - >/dev/null
+        echo "==> Secret argocd/repo-{{.REPO_NAME}} を作成しました"
+
+        title="argocd ($(cd terraform && terraform workspace show))"
+        gh repo deploy-key add "${tmp}/key.pub" --repo {{.REPO}} --title "${title}"
+        echo "==> deploy key を {{.REPO}} に登録しました (read-only)"
+
+  auth-secrets:
+    desc: Dex / oauth2-proxy / Argo CD の OIDC 用 Secret を作る
+    status:
+      - kubectl -n dex get secret dex-secrets >/dev/null 2>&1
+    cmds:
+      - |
+        set -eu
+        echo "GitHub App (または OAuth App) の Client ID を入力してください"
+        read GITHUB_CLIENT_ID
+        echo "同じアプリの Client secret を入力してください"
+        read GITHUB_CLIENT_SECRET
+
+        rand() { openssl rand -base64 32 | tr -- '+/' '-_'; }
+        O2P_SECRET=$(rand)
+        ARGOCD_SECRET=$(rand)
+
+        for ns in dex oauth2-proxy argocd; do
+          kubectl create namespace "${ns}" --dry-run=client -o yaml | kubectl apply -f - >/dev/null
+        done
+
+        kubectl -n dex create secret generic dex-secrets \
+          --from-literal=github-client-id="${GITHUB_CLIENT_ID}" \
+          --from-literal=github-client-secret="${GITHUB_CLIENT_SECRET}" \
+          --from-literal=oauth2-proxy-client-secret="${O2P_SECRET}" \
+          --from-literal=argocd-client-secret="${ARGOCD_SECRET}" \
+          --dry-run=client -o yaml | kubectl apply -f - >/dev/null
+
+        kubectl -n oauth2-proxy create secret generic oidc \
+          --from-literal=client-id=oauth2-proxy \
+          --from-literal=client-secret="${O2P_SECRET}" \
+          --from-literal=cookie-secret="$(rand)" \
+          --dry-run=client -o yaml | kubectl apply -f - >/dev/null
+
+        kubectl -n argocd create secret generic argocd-oidc \
+          --from-literal=clientSecret="${ARGOCD_SECRET}" \
+          --dry-run=client -o yaml \
+          | kubectl label -f - --local -o yaml app.kubernetes.io/part-of=argocd \
+          | kubectl apply -f - >/dev/null
+
+        echo "==> dex-secrets / oidc / argocd-oidc を作成しました"
+
+  start-gitops:
+    desc: app-of-apps のルートを適用して Argo CD に引き継ぐ
+    deps:
+      - task: argocd-repo-key
+      - task: auth-secrets
+    vars:
+      ENV: { sh: 'cd terraform && terraform workspace show' }
+    cmds:
       - kubectl apply -f manifest/root-{{.ENV}}.yaml
 
   health:
@@ -357,4 +443,5 @@ tasks:
       - task: kubeconfig
       - task: render-env-values
       - task: bootstrap-cluster
+      - task: start-gitops
       - task: health
