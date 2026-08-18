@@ -21,14 +21,14 @@ resource "sakura_archive" "talos" {
 #       構築後の設定変更は `talosctl apply-config` で行うこと。
 #
 # NOTE: sakura_cdrom は iso_image_file の *中身* が変わっても差分を検知しない
-#       (hash 属性は computed で、plan の比較に使われない)。
-#       ISO を焼き直しても `No changes` になり、古い config を載せ続けてしまうため、
-#       ファイルの md5 を terraform_data に持たせて replace_triggered_by で強制的に
-#       貼り直す。
+#       (hash 属性は computed で、plan の比較に使われない)。そこでハッシュを
+#       terraform_data に持たせて replace_triggered_by で貼り直す。
+#       ハッシュ元は ISO ではなく machine config。ISO には生成時刻が埋まるため、
+#       config が同じでも焼き直すたびに md5 が変わってしまう。
 resource "terraform_data" "cidata_hash" {
   for_each = { for n in local.talos_input.nodes : n.hostname => n }
 
-  input = filemd5("${path.module}/../talos/build/${local.name}/iso/${each.key}.iso")
+  input = filemd5("${path.module}/../talos/build/${local.name}/config/${each.key}.yaml")
 }
 
 resource "sakura_cdrom" "node_config" {
@@ -47,5 +47,9 @@ resource "sakura_cdrom" "node_config" {
 
   lifecycle {
     replace_triggered_by = [terraform_data.cidata_hash[each.key]]
+
+    # 先にサーバの cdrom_id を差し替えてからでないと、挿さったままの CD を
+    # 削除しにいって API に蹴られ続ける。
+    create_before_destroy = true
   }
 }
