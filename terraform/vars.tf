@@ -146,7 +146,7 @@ variable "bastion_ssh_public_keys" {
 variable "worker_node" {
   type = map(number)
   default = {
-    dev  = 3
+    dev  = 5
     prod = 6
   }
 }
