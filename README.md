@@ -116,32 +116,31 @@ $ aqua install
 | `gh` | v2.97.0 | `task argocd-repo-key` が deploy key の登録に使う。`gh auth login` 済みであること |
 | `task` | v3.52.0 | |
 | `jq` | 1.8.2 | |
+| `envsubst` | v1.4.3 | `task init-env` が `.envrc.tmpl` を埋めるのに使う (a8m/envsubst) |
 
 ## 環境変数と direnv
 
 このリポジトリは **direnv 前提**です。API キーやバケット名は `.envrc` に置き、
 リポジトリに入った時点で direnv が自動で読み込む。`.envrc` は gitignore してあるので、
-**メンバーそれぞれが自分の手元で用意する**（`./init.sh` が対話で作ってくれる）。
+**メンバーそれぞれが自分の手元で用意する**（`./init.sh` が対話で聞いて、
+リポジトリに入っている **`.envrc.tmpl`** を `envsubst` で埋めて作ってくれる）。
 
-`.envrc` はこんな中身になる:
+秘密情報を task が対話で聞き直すことはしない。**task は常に環境変数を見る**ので、
+新しい値が要るようになったら `.envrc.tmpl` にプレースホルダを足す。
+作り直したいときは `task reset-env`。
 
-```bash
-export KUBECONFIG=./.kube/config
-export TALOSCONFIG=./talos/talosconfig
+`.envrc` に入る値は `.envrc.tmpl` を参照。内訳はこう:
 
-export SAKURACLOUD_ACCESS_TOKEN=...        # さくらのクラウド API キー
-export SAKURACLOUD_ACCESS_TOKEN_SECRET=...
-export SAKURACLOUD_ZONE=tk1b               # 東京第2
-
-# tfstate 用 (さくらのオブジェクトストレージ)
-export TF_STATE_BUCKET=ictsc-void-k8s-dev
-export TF_CLI_ARGS_init="-backend-config=bucket=$TF_STATE_BUCKET"
-export AWS_ACCESS_KEY_ID=...
-export AWS_SECRET_ACCESS_KEY=...
-
-# https://cloud.sakura.ad.jp/news/2025/02/04/objectstorage_defectversion/ のワークアラウンド
-export AWS_REQUEST_CHECKSUM_CALCULATION=when_required
-```
+| 変数 | 用途 |
+| --- | --- |
+| `KUBECONFIG` / `TALOSCONFIG` | kubectl / talosctl の設定をリポジトリ内に閉じる |
+| `SAKURACLOUD_ACCESS_TOKEN` / `_SECRET` | さくらのクラウド API キー |
+| `SAKURACLOUD_ZONE` | サーバを建てるゾーン (`tk1b` = 東京第2) |
+| `TF_STATE_BUCKET` / `TF_CLI_ARGS_init` | tfstate 置き場 (さくらのオブジェクトストレージ) |
+| `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` | 同上のアクセスキー |
+| `AWS_REQUEST_CHECKSUM_CALCULATION` | さくらのオブジェクトストレージ側の不具合のワークアラウンド |
+| `GITHUB_CLIENT_ID` / `GITHUB_CLIENT_SECRET` | Dex が使う GitHub App。`task auth-secrets` が読む |
+| `ACME_EMAIL` | Let's Encrypt の通知先。`task render-env-values` が読む |
 
 `terraform` の `backend "s3"` ブロックは変数展開ができないので、バケット名は
 **`TF_CLI_ARGS_init`** 経由で `terraform init` に渡している。
@@ -192,8 +191,10 @@ $ task up
 | `task start-gitops` | app-of-apps のルートを適用して Argo CD に引き継ぐ |
 | `task health` | `talosctl health` でクラスタの健全性を確認 |
 
-`task up` の途中で **GitHub App (または OAuth App) の Client ID / secret を聞かれる**。
-先に用意しておくこと (「認証 (Dex + oauth2-proxy)」を参照)。
+`task auth-secrets` は **`.envrc` の `GITHUB_CLIENT_ID` / `GITHUB_CLIENT_SECRET`** を読む。
+GitHub App (または OAuth App) は `./init.sh` より先に用意しておくこと
+(「認証 (Dex + oauth2-proxy)」を参照)。未設定なら task はその場で落ちるので、
+`.envrc` に足して `direnv allow` するか `task reset-env` でやり直す。
 `argocd-repo-key` は `gh` で deploy key を登録するので、リポジトリの admin 権限が要る。
 どちらも作成済みなら status 判定でスキップされる。
 
@@ -301,6 +302,7 @@ GitHub App --(callback: dex.<domain>/callback)--> Dex --OIDC--> oauth2-proxy
 
 ## 秘密情報
 
+- `.envrc.tmpl` — `.envrc` の雛形 (これはコミットする)
 - `.envrc` — さくらのクラウドの API キーなど (gitignore 済み / direnv が読む)
 - `talos/secrets.yaml` — **クラスタの PKI。これを失うとクラスタを操作できなくなる**ので
   必ずどこかにバックアップすること (gitignore 済み)

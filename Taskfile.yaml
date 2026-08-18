@@ -10,7 +10,7 @@ vars:
   # Gateway API の CRD。ExternalAuth フィルタ (GEP-1494) を使うので
   # standard ではなく experimental チャネルを入れる必要がある。
   GATEWAY_API_VERSION: v1.6.1
-  # Let's Encrypt の失効通知などが飛ぶ宛先
+  # Let's Encrypt の失効通知などが飛ぶ宛先。.envrc (direnv) の ACME_EMAIL を読む。
   ACME_EMAIL: '{{.ACME_EMAIL | default "TODO-set-me@ictsc.net"}}'
 
 tasks:
@@ -64,11 +64,18 @@ tasks:
       - direnv allow
 
   init-env-file:
-    desc: .envrcを作成
+    desc: .envrc.tmpl から .envrc を作成
     internal: true
     silent: true
+    deps:
+      - task: check-binary
+        vars:
+          BINARY: envsubst
+          INSTALL_DOC: "aqua install で導入されます (aqua.yaml を参照)"
     vars:
-      SAKURACLOUD_ZONE: tk1b
+      DEFAULT_ZONE: tk1b
+      DEFAULT_BUCKET: ictsc-void-k8s-dev
+      DEFAULT_ACME_EMAIL: TODO-set-me@ictsc.net
     status:
       - test -f .envrc
     cmds:
@@ -77,32 +84,26 @@ tasks:
         read SAKURACLOUD_ACCESS_TOKEN
         echo "さくらクラウドのアクセスシークレットを入力してください"
         read SAKURACLOUD_ACCESS_TOKEN_SECRET
-        echo "tfstateを保存するバケットを選択してください (default: ictsc-void-k8s-dev)"
+        echo "tfstateを保存するバケットを選択してください (default: {{.DEFAULT_BUCKET}})"
         read TF_STATE_BUCKET
-        if [ -z "$TF_STATE_BUCKET" ]; then
-          TF_STATE_BUCKET=ictsc-void-k8s-dev
-        fi
+        TF_STATE_BUCKET=${TF_STATE_BUCKET:-{{.DEFAULT_BUCKET}}}
         echo "さくらのオブジェクトストレージのアクセスキーを入力してください"
-        read TF_STATE_ACCESS_KEY
+        read AWS_ACCESS_KEY_ID
         echo "さくらのオブジェクトストレージのシークレットキーを入力してください"
-        read TF_STATE_SECRET_KEY
-        {
-          echo "export KUBECONFIG=./.kube/config";
-          echo "export TALOSCONFIG=./talos/talosconfig";
-          echo "";
-          echo "export SAKURACLOUD_ACCESS_TOKEN=$SAKURACLOUD_ACCESS_TOKEN";
-          echo "export SAKURACLOUD_ACCESS_TOKEN_SECRET=$SAKURACLOUD_ACCESS_TOKEN_SECRET";
-          echo "export SAKURACLOUD_ZONE={{.SAKURACLOUD_ZONE}}";
-          echo "";
-          echo "# tfstate 用 (さくらのオブジェクトストレージ)";
-          echo "export TF_STATE_BUCKET=$TF_STATE_BUCKET";
-          echo "export TF_CLI_ARGS_init=\"-backend-config=bucket=\$TF_STATE_BUCKET\"";
-          echo "export AWS_ACCESS_KEY_ID=$TF_STATE_ACCESS_KEY";
-          echo "export AWS_SECRET_ACCESS_KEY=$TF_STATE_SECRET_KEY";
-          echo "";
-          echo "# https://cloud.sakura.ad.jp/news/2025/02/04/objectstorage_defectversion/ のワークアラウンド"
-          echo "export AWS_REQUEST_CHECKSUM_CALCULATION=when_required";
-        } > .envrc
+        read AWS_SECRET_ACCESS_KEY
+        echo "GitHub App (または OAuth App) の Client ID を入力してください"
+        read GITHUB_CLIENT_ID
+        echo "同じアプリの Client secret を入力してください"
+        read GITHUB_CLIENT_SECRET
+        echo "Let's Encrypt の通知先メールアドレスを入力してください (default: {{.DEFAULT_ACME_EMAIL}})"
+        read ACME_EMAIL
+        ACME_EMAIL=${ACME_EMAIL:-{{.DEFAULT_ACME_EMAIL}}}
+        SAKURACLOUD_ZONE={{.DEFAULT_ZONE}}
+        export SAKURACLOUD_ACCESS_TOKEN SAKURACLOUD_ACCESS_TOKEN_SECRET SAKURACLOUD_ZONE \
+          TF_STATE_BUCKET AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY \
+          GITHUB_CLIENT_ID GITHUB_CLIENT_SECRET ACME_EMAIL
+        umask 077
+        envsubst < .envrc.tmpl > .envrc
         echo ".envrcを作成しました"
 
   reset-env:
@@ -357,10 +358,12 @@ tasks:
     cmds:
       - |
         set -eu
-        echo "GitHub App (または OAuth App) の Client ID を入力してください"
-        read GITHUB_CLIENT_ID
-        echo "同じアプリの Client secret を入力してください"
-        read GITHUB_CLIENT_SECRET
+        # 値は .envrc (direnv) から取る。聞き直さない。
+        if [ -z "${GITHUB_CLIENT_ID:-}" ] || [ -z "${GITHUB_CLIENT_SECRET:-}" ]; then
+          echo "GITHUB_CLIENT_ID / GITHUB_CLIENT_SECRET が設定されていません" >&2
+          echo ".envrc.tmpl を参考に .envrc へ追記して direnv allow するか、task reset-env で作り直してください" >&2
+          exit 1
+        fi
 
         rand() { openssl rand -base64 32 | tr -- '+/' '-_'; }
         O2P_SECRET=$(rand)

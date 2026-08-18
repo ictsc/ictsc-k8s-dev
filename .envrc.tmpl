@@ -1,0 +1,23 @@
+export KUBECONFIG=./.kube/config
+export TALOSCONFIG=./talos/talosconfig
+
+export SAKURACLOUD_ACCESS_TOKEN="${SAKURACLOUD_ACCESS_TOKEN}"
+export SAKURACLOUD_ACCESS_TOKEN_SECRET="${SAKURACLOUD_ACCESS_TOKEN_SECRET}"
+export SAKURACLOUD_ZONE="${SAKURACLOUD_ZONE}"
+
+# tfstate 用 (さくらのオブジェクトストレージ)
+export TF_STATE_BUCKET="${TF_STATE_BUCKET}"
+export TF_CLI_ARGS_init="-backend-config=bucket=${TF_STATE_BUCKET}"
+export AWS_ACCESS_KEY_ID="${AWS_ACCESS_KEY_ID}"
+export AWS_SECRET_ACCESS_KEY="${AWS_SECRET_ACCESS_KEY}"
+
+# https://cloud.sakura.ad.jp/news/2025/02/04/objectstorage_defectversion/ のワークアラウンド
+export AWS_REQUEST_CHECKSUM_CALCULATION=when_required
+
+# Dex が GitHub でログインさせるための GitHub App (または OAuth App)
+# task auth-secrets がここから読む
+export GITHUB_CLIENT_ID="${GITHUB_CLIENT_ID}"
+export GITHUB_CLIENT_SECRET="${GITHUB_CLIENT_SECRET}"
+
+# Let's Encrypt の失効通知などが飛ぶ宛先 (task render-env-values が読む)
+export ACME_EMAIL="${ACME_EMAIL}"
