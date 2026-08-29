@@ -263,10 +263,15 @@ ${gen}
 # groups / username の prefix "oidc:" は control plane の
 # AuthenticationConfiguration (talos/scripts/gen-config.sh) と揃えること。
 #
-# Dex の github connector は orgs に teams を書いていないとき、groups claim を
-# organization 名だけにする。つまり "oidc:ictsc" = ictsc org のメンバー全員。
-# team 単位に絞りたくなったら dex の orgs に teams を足し、ここを
-# "oidc:ictsc:<team>" に変える。
+# Dex の github connector は orgs に teams を書いていなくても、groups claim を
+# "<org>:<team>" 形式で返す (実測: ictsc org / ictsc2026 team のユーザで
+# groups = ["ictsc:ictsc2026"])。org 名だけの "ictsc" は返ってこない。
+# RBAC にワイルドカードは書けないので、権限を渡す team をここに列挙する。
+# 新しい team (来年度など) を作ったらここに足すこと。
+#
+# 実際に何が来ているかは、ログイン後に ID トークンを見るのが早い:
+#   cat ~/.kube/cache/oidc-login/* | jq -r .id_token \
+#     | cut -d. -f2 | base64 -d 2>/dev/null | jq .groups
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
@@ -275,7 +280,7 @@ metadata:
     argocd.argoproj.io/sync-wave: "-1"
 subjects:
   - kind: Group
-    name: "oidc:ictsc"
+    name: "oidc:ictsc:ictsc2026"
     apiGroup: rbac.authorization.k8s.io
 roleRef:
   kind: ClusterRole

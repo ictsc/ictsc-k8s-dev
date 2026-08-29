@@ -335,7 +335,7 @@ kubectl --> kubelogin --> ブラウザ --> Dex --> GitHub (org: ictsc)
                                  kube-apiserver が検証
 ```
 
-`ictsc` org のメンバーであれば `cluster-admin` が付く
+`ictsc` org の `ictsc2026` team のメンバーに `cluster-admin` が付く
 (`manifest/envs/<env>/resources/rbac-oidc.yaml`)。
 
 > [!NOTE]
@@ -359,7 +359,6 @@ $ kubectl config set-credentials oidc \
     --exec-arg=get-token \
     --exec-arg=--oidc-issuer-url=https://dex.k8s-dev.ictsc.net \
     --exec-arg=--oidc-client-id=kubernetes \
-    --exec-arg=--oidc-use-pkce \
     --exec-arg=--oidc-extra-scope=profile \
     --exec-arg=--oidc-extra-scope=email \
     --exec-arg=--oidc-extra-scope=groups
@@ -392,12 +391,25 @@ $ kubectl get nodes          # ブラウザが開いて GitHub 認証 -> 成功�
 $ rm -rf ~/.kube/cache/oidc-login
 ```
 
-#### 権限を team 単位に分ける
+#### 権限を渡す team を増やす
 
-Dex の github connector は `orgs` に `teams` を書いていないとき、groups claim を
-org 名だけにする (= `oidc:ictsc`)。team で絞りたい場合は
-`manifest/scripts/render-env.sh` の `connectors[].config.orgs` に `teams` を足し、
-`resources/rbac-oidc.yaml` の Group 名を `oidc:ictsc:<team>` に変える。
+Dex の github connector は `orgs` に `teams` を書いていなくても、groups claim を
+**`<org>:<team>` 形式**で返す。org 名だけの `ictsc` は返ってこないので、
+RBAC には team を列挙する必要がある (ワイルドカードは書けない)。
+
+新しい team を作ったら `manifest/scripts/render-env.sh` の `rbac-oidc.yaml` の
+`subjects` に `oidc:<org>:<team>` を足して `task render-env-values`。
+
+自分のトークンに何が入っているかは、ログイン後にこれで見られる:
+
+```console
+$ cat ~/.kube/cache/oidc-login/* | jq -r .id_token \
+    | cut -d. -f2 | base64 -d 2>/dev/null | jq '{email, groups}'
+{
+  "email": "you@example.com",
+  "groups": ["ictsc:ictsc2026"]
+}
+```
 
 > [!WARNING]
 > apiserver に渡すファイルは **`permissions: 0o444`** でなければならない。
