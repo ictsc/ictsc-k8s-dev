@@ -354,12 +354,15 @@ kubectl --> kubelogin --> ブラウザ --> Dex --> GitHub (org: ictsc)
 $ kubectl config set-credentials oidc \
     --exec-api-version=client.authentication.k8s.io/v1 \
     --exec-command=kubectl \
+    --exec-interactive-mode=IfAvailable \
     --exec-arg=oidc-login \
     --exec-arg=get-token \
     --exec-arg=--oidc-issuer-url=https://dex.k8s-dev.ictsc.net \
     --exec-arg=--oidc-client-id=kubernetes \
     --exec-arg=--oidc-use-pkce \
-    --exec-arg=--oidc-extra-scope=profile,email,groups
+    --exec-arg=--oidc-extra-scope=profile \
+    --exec-arg=--oidc-extra-scope=email \
+    --exec-arg=--oidc-extra-scope=groups
 
 $ kubectl config set-context ictsc-dev-sso \
     --cluster=ictsc-dev --user=oidc
@@ -370,6 +373,18 @@ $ kubectl get nodes          # ブラウザが開いて GitHub 認証 -> 成功�
 
 `--cluster` の名前は `kubectl config get-clusters` で確認すること
 (`task kubeconfig` が作る context 名は workspace 名 = `dev`)。
+
+> [!WARNING]
+> 上のコマンドには落とし穴が2つある。
+>
+> - **`--exec-interactive-mode` は必須。** `client.authentication.k8s.io/v1` には
+>   既定値が無く、省略すると
+>   `interactiveMode must be specified for oidc to use exec authentication plugin`
+>   で `kubectl` が何もできなくなる (`v1beta1` なら既定値があるので出ない)。
+> - **`--exec-arg` の値にカンマを書かない。** `set-credentials` はカンマを引数の
+>   区切りとして解釈するため、`--oidc-extra-scope=profile,email,groups` は
+>   `--oidc-extra-scope=profile` / `email` / `groups` の3引数に分解されて壊れる。
+>   スコープは1つずつ `--exec-arg` を並べること。
 
 トークンは `~/.kube/cache/oidc-login/` にキャッシュされる。作り直したいときは:
 
