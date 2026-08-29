@@ -322,6 +322,82 @@ GitHub App --(callback: dex.<domain>/callback)--> Dex --OIDC--> oauth2-proxy
 > **保護対象ホスト自身**に置く必要がある。別ホスト (auth.<domain> など) に集約すると
 > ログイン後に元のアプリへ戻れない。
 
+### kubectl を GitHub SSO で使う
+
+`kubectl` も同じ Dex を OIDC プロバイダとして使う。証明書ベースの管理者 kubeconfig
+(`task kubeconfig` が取るもの) とは独立して動くので、**Dex が落ちても締め出されない**。
+
+```plain
+kubectl --> kubelogin --> ブラウザ --> Dex --> GitHub (org: ictsc)
+                                        |
+                                    ID Token
+                                        v
+                                 kube-apiserver が検証
+```
+
+`ictsc` org のメンバーであれば `cluster-admin` が付く
+(`manifest/envs/<env>/resources/rbac-oidc.yaml`)。
+
+> [!NOTE]
+> Kubernetes 1.35 で `--oidc-*` フラグは**削除**された。そのため apiserver へは
+> `AuthenticationConfiguration` をファイルで渡している。Talos v1.13 には専用の
+> 設定フィールドが無い (`authConfig` / `authenticationConfig` はどちらも
+> unknown key) ので、`machine.files` で置いて `extraVolumes` で読ませている。
+> 生成は `talos/scripts/gen-config.sh`。
+
+#### 使い方
+
+`aqua install` で `kubelogin` が入る (`kubectl oidc-login` として呼ばれる)。
+自分の kubeconfig に context を足す:
+
+```console
+$ kubectl config set-credentials oidc \
+    --exec-api-version=client.authentication.k8s.io/v1 \
+    --exec-command=kubectl \
+    --exec-arg=oidc-login \
+    --exec-arg=get-token \
+    --exec-arg=--oidc-issuer-url=https://dex.k8s-dev.ictsc.net \
+    --exec-arg=--oidc-client-id=kubernetes \
+    --exec-arg=--oidc-use-pkce \
+    --exec-arg=--oidc-extra-scope=profile,email,groups
+
+$ kubectl config set-context ictsc-dev-sso \
+    --cluster=ictsc-dev --user=oidc
+
+$ kubectl config use-context ictsc-dev-sso
+$ kubectl get nodes          # ブラウザが開いて GitHub 認証 -> 成功すれば完了
+```
+
+`--cluster` の名前は `kubectl config get-clusters` で確認すること
+(`task kubeconfig` が作る context 名は workspace 名 = `dev`)。
+
+トークンは `~/.kube/cache/oidc-login/` にキャッシュされる。作り直したいときは:
+
+```console
+$ rm -rf ~/.kube/cache/oidc-login
+```
+
+#### 権限を team 単位に分ける
+
+Dex の github connector は `orgs` に `teams` を書いていないとき、groups claim を
+org 名だけにする (= `oidc:ictsc`)。team で絞りたい場合は
+`manifest/scripts/render-env.sh` の `connectors[].config.orgs` に `teams` を足し、
+`resources/rbac-oidc.yaml` の Group 名を `oidc:ictsc:<team>` に変える。
+
+> [!WARNING]
+> apiserver に渡すファイルは **`permissions: 0o444`** でなければならない。
+> apiserver は非 root (UID 65534) で動くため、`0o400` にすると読めずに
+> exit 1 で crashloop する。また `op:` は **`create`** を使うこと。
+> `overwrite` は既存ファイル前提なので、初回は
+> `file must exist: ...` で `writeUserFiles` ごと失敗し、
+> **kubelet も etcd も起動しなくなる**。
+
+> [!WARNING]
+> この設定変更は control plane の**再起動を伴う**。必ず **1台ずつ**
+> `talosctl apply-config` して、`kubectl get pod -n kube-system | grep apiserver` が
+> `1/1 Running` になったのを確認してから次へ進むこと。3台同時にやると
+> etcd の quorum を失う。
+
 ## 秘密情報
 
 - `.envrc.tmpl` — `.envrc` の雛形 (これはコミットする)

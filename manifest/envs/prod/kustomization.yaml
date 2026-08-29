@@ -11,4 +11,5 @@ resources:
   - ./resources/cilium-l2-announcement.yaml
   - ./resources/gateway.yaml
   - ./resources/cluster-issuer.yaml
+  - ./resources/rbac-oidc.yaml
   - ./resources/httproutes.yaml

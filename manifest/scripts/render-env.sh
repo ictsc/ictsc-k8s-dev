@@ -118,6 +118,17 @@ config:
       secretEnv: ARGOCD_CLIENT_SECRET
       redirectURIs:
         - https://argocd.${domain}/auth/callback
+    # kubectl (kubelogin) 用。CLI にクライアントシークレットは隠せないので
+    # public client にして PKCE で守る。redirectURI は kubelogin が
+    # ローカルに立てる一時サーバ。既定のポートを両方書いておく。
+    - id: kubernetes
+      name: Kubernetes
+      public: true
+      redirectURIs:
+        - http://localhost:8000
+        - http://localhost:18000
+        - http://127.0.0.1:8000
+        - http://127.0.0.1:18000
 EOF
 
 ########################################
@@ -243,6 +254,33 @@ spec:
               - name: external
                 namespace: gateway
                 kind: Gateway
+EOF
+
+cat > "${d}/resources/rbac-oidc.yaml" <<EOF
+${gen}
+#
+# Dex 経由で入ってきた GitHub ユーザに権限を渡す。
+# groups / username の prefix "oidc:" は control plane の
+# AuthenticationConfiguration (talos/scripts/gen-config.sh) と揃えること。
+#
+# Dex の github connector は orgs に teams を書いていないとき、groups claim を
+# organization 名だけにする。つまり "oidc:ictsc" = ictsc org のメンバー全員。
+# team 単位に絞りたくなったら dex の orgs に teams を足し、ここを
+# "oidc:ictsc:<team>" に変える。
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: oidc-ictsc-cluster-admin
+  annotations:
+    argocd.argoproj.io/sync-wave: "-1"
+subjects:
+  - kind: Group
+    name: "oidc:ictsc"
+    apiGroup: rbac.authorization.k8s.io
+roleRef:
+  kind: ClusterRole
+  name: cluster-admin
+  apiGroup: rbac.authorization.k8s.io
 EOF
 
 cat > "${d}/resources/httproutes.yaml" <<EOF

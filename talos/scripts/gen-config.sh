@@ -30,6 +30,7 @@ q() { jq -r "$1" "${input}"; }
 cluster_name="$(q '.cluster_name')"
 cluster_endpoint="$(q '.cluster_endpoint')"
 kubernetes_version="$(q '.kubernetes_version')"
+talos_version="$(q '.talos_version')"
 api_vip="$(q '.api_vip')"
 domain="$(q '.domain')"
 external_cidr="$(q '.external_cidr')"
@@ -78,12 +79,62 @@ cluster:
       - ${internal_network}
 EOF
 
+# kubectl の GitHub SSO (Dex 経由の OIDC)。
+#
+# Kubernetes 1.35 で --oidc-* フラグは削除されたため、AuthenticationConfiguration を
+# ファイルで渡す。Talos v1.13 には専用フィールドが無い (authConfig /
+# authenticationConfig はどちらも unknown key) ので、machine.files でファイルを置き、
+# extraVolumes で apiserver に読ませる。
+#
+# Dex の証明書は Let's Encrypt なので certificateAuthority は不要 (システムCAを使う)。
+# username / groups の prefix は manifest 側の ClusterRoleBinding と揃えること。
+cat >"${build}/patches/controlplane-oidc.yaml" <<EOF
+machine:
+  files:
+    - path: /var/lib/kubernetes/auth/authentication-config.yaml
+      # apiserver は非 root (UID 65534) で動くので 0o400 だと読めず、
+      # コンテナが exit 1 で crashloop する。issuer URL と claim 名しか
+      # 入っていない (秘密情報なし) ので 0o444 でよい。
+      permissions: 0o444
+      # overwrite は「既にあるファイルを上書き」なので、ファイルが無い初回は
+      #   file must exist: "/var/lib/kubernetes/auth/authentication-config.yaml"
+      # で writeUserFiles ごと失敗し、kubelet も etcd も起動しなくなる。
+      # create は「無ければ作る / あれば何もしない」なのでこちらを使う。
+      # NOTE: create のため、この中身を変えても既存ノードには反映されない。
+      #       変更するときは talosctl でファイルを消してから apply-config すること。
+      op: create
+      content: |
+        apiVersion: apiserver.config.k8s.io/v1
+        kind: AuthenticationConfiguration
+        jwt:
+          - issuer:
+              url: https://dex.${domain}
+              audiences:
+                - kubernetes
+            claimMappings:
+              username:
+                claim: email
+                prefix: "oidc:"
+              groups:
+                claim: groups
+                prefix: "oidc:"
+cluster:
+  apiServer:
+    extraArgs:
+      authentication-config: /etc/kubernetes/auth/authentication-config.yaml
+    extraVolumes:
+      - hostPath: /var/lib/kubernetes/auth
+        mountPath: /etc/kubernetes/auth
+        readonly: true
+EOF
+
 ########################################
 # 3. ロールごとのベース config
 ########################################
 echo "==> talosctl gen config (${cluster_name} / ${cluster_endpoint})"
 talosctl gen config "${cluster_name}" "${cluster_endpoint}" \
   --with-secrets "${secrets}" \
+  --talos-version "${talos_version}" \
   --kubernetes-version "${kubernetes_version}" \
   --output-dir "${build}/base" \
   --force \
@@ -91,6 +142,7 @@ talosctl gen config "${cluster_name}" "${cluster_endpoint}" \
   --config-patch "@${build}/patches/all-dynamic.yaml" \
   --config-patch-control-plane "@${patch_dir}/controlplane.yaml" \
   --config-patch-control-plane "@${build}/patches/controlplane-dynamic.yaml" \
+  --config-patch-control-plane "@${build}/patches/controlplane-oidc.yaml" \
   --config-patch-worker "@${patch_dir}/worker.yaml"
 
 ########################################
@@ -171,8 +223,8 @@ done
 # 5. talosctl 用のクライアント設定
 ########################################
 cp "${build}/base/talosconfig" "${talos_dir}/talosconfig"
-talosctl --talosconfig "${talos_dir}/talosconfig" config endpoint \
-  $(jq -r '.nodes[] | select(.role == "controlplane") | .external_ip' "${input}")
+talosctl --talosconfig "${talos_dir}/talosconfig" config endpoints \
+  $(jq -r '[.nodes[] | select(.role == "controlplane") | .external_ip] | join(" ")' "${input}")
 
 echo
 echo "生成完了: ${build}"

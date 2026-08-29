@@ -1,0 +1,24 @@
+# このファイルは `task render-env-values` が terraform output から生成する
+#
+# Dex 経由で入ってきた GitHub ユーザに権限を渡す。
+# groups / username の prefix "oidc:" は control plane の
+# AuthenticationConfiguration (talos/scripts/gen-config.sh) と揃えること。
+#
+# Dex の github connector は orgs に teams を書いていないとき、groups claim を
+# organization 名だけにする。つまり "oidc:ictsc" = ictsc org のメンバー全員。
+# team 単位に絞りたくなったら dex の orgs に teams を足し、ここを
+# "oidc:ictsc:<team>" に変える。
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: oidc-ictsc-cluster-admin
+  annotations:
+    argocd.argoproj.io/sync-wave: "-1"
+subjects:
+  - kind: Group
+    name: "oidc:ictsc"
+    apiGroup: rbac.authorization.k8s.io
+roleRef:
+  kind: ClusterRole
+  name: cluster-admin
+  apiGroup: rbac.authorization.k8s.io

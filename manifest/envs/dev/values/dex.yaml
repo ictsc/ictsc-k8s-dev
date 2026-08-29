@@ -34,3 +34,14 @@ config:
       secretEnv: ARGOCD_CLIENT_SECRET
       redirectURIs:
         - https://argocd.k8s-dev.ictsc.net/auth/callback
+    # kubectl (kubelogin) 用。CLI にクライアントシークレットは隠せないので
+    # public client にして PKCE で守る。redirectURI は kubelogin が
+    # ローカルに立てる一時サーバ。既定のポートを両方書いておく。
+    - id: kubernetes
+      name: Kubernetes
+      public: true
+      redirectURIs:
+        - http://localhost:8000
+        - http://localhost:18000
+        - http://127.0.0.1:8000
+        - http://127.0.0.1:18000
