@@ -209,6 +209,52 @@ tasks:
       - task: apply-network
       - task: talos-config
       - task: apply-terraform
+      - task: prune-nodes
+
+  prune-nodes:
+    desc: Terraform 上に存在しないのに残っている Node オブジェクトを削除
+    cmds:
+      # サーバを消しても Kubernetes の Node は残り続ける。Terraform は Kubernetes を
+      # 知らないし、Talos も他ノードの Node を消したりはしないため、ここで面倒をみる。
+      #
+      # NOTE: drain はここではやらない。この時点で対象のサーバは Terraform に
+      #       消された後で、退避先も退避元も存在しないため意味がない。
+      #       台数を減らすときは vars.tf を書き換える *前* に drain しておくこと。
+      - |
+        set -eu
+        # 初回構築ではまだクラスタが無い
+        if ! kubectl get nodes >/dev/null 2>&1; then
+          echo "==> クラスタに到達できないため Node の掃除をスキップ"
+          exit 0
+        fi
+
+        tmp=$(mktemp -d)
+        trap 'rm -rf "${tmp}"' EXIT
+        (cd terraform && terraform output -json talos_input) \
+          | jq -r '.nodes[].hostname' | sort > "${tmp}/expected"
+        kubectl get nodes -o jsonpath='{range .items[*]}{.metadata.name}{"\n"}{end}' \
+          | sort > "${tmp}/actual"
+
+        stale=$(comm -13 "${tmp}/expected" "${tmp}/actual")
+        if [ -z "${stale}" ]; then
+          echo "==> 余分な Node はありません"
+          exit 0
+        fi
+
+        for node in ${stale}; do
+          # control plane を消すと etcd にメンバーの残骸が残る。ここでは触らない。
+          if kubectl get node "${node}" \
+            -o jsonpath='{.metadata.labels.node-role\.kubernetes\.io/control-plane}' \
+            | grep -q .; then
+            echo "==> ${node} は control plane のためスキップします" >&2
+            echo "    etcd のメンバー削除が必要です:" >&2
+            echo "      talosctl -n <残っている cp の IP> etcd remove-member ${node}" >&2
+            echo "      kubectl delete node ${node}" >&2
+            continue
+          fi
+          echo "==> Node ${node} を削除"
+          kubectl delete node "${node}"
+        done
 
   destroy:
     desc: 全てのリソースを削除

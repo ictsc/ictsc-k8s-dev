@@ -146,21 +146,21 @@ variable "bastion_ssh_public_keys" {
 variable "worker_node" {
   type = map(number)
   default = {
-    dev  = 5
+    dev  = 3
     prod = 6
   }
 }
 variable "worker_node_cpu" {
   type = map(number)
   default = {
-    dev  = 2
+    dev  = 6
     prod = 2
   }
 }
 variable "worker_node_mem" {
   type = map(number)
   default = {
-    dev  = 4
+    dev  = 12
     prod = 4
   }
 }
