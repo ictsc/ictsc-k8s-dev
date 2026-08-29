@@ -47,6 +47,12 @@ metadata:
   namespace: gateway
   annotations:
     argocd.argoproj.io/sync-wave: "-10"
+    # cert-manager の CRD は Argo CD が同期を始める時点ではまだ無い
+    # (cert-manager 自体が wave -20 の Application として入る)。
+    # Argo CD は実行前に全タスクを dry-run 検証するため、これが無いと
+    # "failed to discover server resources for group version cert-manager.io/v1"
+    # で同期プランごと却下され、cert-manager が永久に入らないデッドロックになる。
+    argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
 spec:
   secretName: external-tls
   issuerRef:
