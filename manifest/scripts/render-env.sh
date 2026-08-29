@@ -187,7 +187,12 @@ metadata:
   name: external
   namespace: gateway
   annotations:
-    argocd.argoproj.io/sync-wave: "-10"
+    # Gateway と同じ wave に置く。Gateway の HTTPS listener はこの Certificate が作る
+    # Secret external-tls を要求し、逆にこの Certificate の HTTP-01 チャレンジは
+    # Gateway が無いと解けないという相互依存になっている。別々の wave に分けると
+    # Argo CD が Gateway の Healthy を待って次の wave に進まず、
+    # "Listener: Invalid CertificateRef" のまま永久に止まる。
+    argocd.argoproj.io/sync-wave: "-15"
     # cert-manager の CRD は Argo CD が同期を始める時点ではまだ無い
     # (cert-manager 自体が wave -20 の Application として入る)。
     # Argo CD は実行前に全タスクを dry-run 検証するため、これが無いと
@@ -216,7 +221,9 @@ kind: ClusterIssuer
 metadata:
   name: letsencrypt
   annotations:
-    argocd.argoproj.io/sync-wave: "-12"
+    # Certificate より先に居ればよい。ACME アカウント登録に Gateway は不要なので
+    # Gateway (-15) より前の wave に置く。
+    argocd.argoproj.io/sync-wave: "-16"
     # cert-manager の CRD は Argo CD が同期を始める時点ではまだ無い
     # (cert-manager 自体が wave -20 の Application として入る)。
     # Argo CD は実行前に全タスクを dry-run 検証するため、これが無いと
