@@ -17,7 +17,7 @@ spec:
   gatewayClassName: cilium
   addresses:
     - type: IPAddress
-      value: "27.133.151.184"
+      value: "27.133.146.104"
   listeners:
     # cert-manager が ACME チャレンジ用の HTTPRoute をここに生やすので必須
     - name: http

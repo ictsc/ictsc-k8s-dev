@@ -23,12 +23,27 @@ variable "domain" {
 # ネットワーク
 ########################################
 
-# 必要なグローバルIP数 = control_plane + worker_node + 2 (API VIP / Ingress VIP)
+# 必要なグローバルIP数 = control_plane + worker_node + 3
+#   +3 の内訳: API VIP / Ingress VIP / 踏み台 (割り当ては locals.tf を参照)
 # /28 -> 11個, /27 -> 27個, /26 -> 59個
+#
+# WARNING: netmask を変えると sakura_internet が作り直しになる。さくらのクラウドは
+#          サーバが接続されたままのルータ+スイッチを削除させてくれないので、
+#          `terraform apply` はサーバを消さずにルータだけ消そうとして延々ハングする
+#          (`-target=sakura_internet.k8s_external` でも同じ)。
+#          変更するときは `task destroy` で全部消してから作り直すこと。
+#          そのため最初から余裕を持たせておく。
+#
+#          どうしても後から足したい場合の逃げ道として sakura_subnet
+#          (コントロールパネルの「スタティックルート追加」) がある。ルータを
+#          作り直さずに /26-/28 のブロックを追加できるが、追加ブロックは同一 L2
+#          ではなく next_hop に指定したサーバ経由のルーティングになる。
+#          Talos の shared VIP と Cilium の L2 Announcement は同一 L2 を要求するので
+#          VIP には使えない。使えるのは転送さえ通れば良い worker の eth0 まで。
 variable "external_subnet" {
   type = map(number)
   default = {
-    dev  = 28
+    dev  = 27
     prod = 27
   }
 }

@@ -28,15 +28,18 @@ ictsc-k8s-dev/
 - **GitOps**: Argo CD (app-of-apps)
 - **入口**: Cilium Gateway API + cert-manager (Let's Encrypt / HTTP-01)
 - **認証**: Dex (GitHub) + oauth2-proxy を Gateway API の ExternalAuth で前段に置く
-- **ノードのスペック**: 全ノード 2コア / 4GB / ディスク 40GB (`terraform/vars.tf`)
-  - 使えるサーバスペックの上限が **2コア / 4GB** なので、これ以上は盛れない。
-    足りない場合は台数 (`control_plane` / `worker_node`) を増やす方向で対応する
+- **ノードのスペック** (`terraform/vars.tf`)
+  - control plane / 踏み台: 2コア / 4GB / ディスク 40GB
+  - worker (dev): 6コア / 12GB / ディスク 40GB
+  - 以前このドキュメントには「使えるサーバスペックの上限は 2コア / 4GB」と
+    書いてあったが**誤り**。2026-08-29 に tk1a で 6コア / 12GB (`cloud/plan/6core-12gb`)
+    の worker 3台が問題なく起動することを確認済み。上限で悩んだら実際に apply して試すこと
 
 ### ネットワーク
 
 | セグメント | 用途 |
 | --- | --- |
-| ルータ+スイッチ (`sakura_internet`, dev は /28) | 全ノードの eth0。API VIP と LoadBalancer IP もここ |
+| ルータ+スイッチ (`sakura_internet`, dev / prod とも /27) | 全ノードの eth0。API VIP と LoadBalancer IP もここ |
 | vSwitch `192.168.100.0/24` (`sakura_vswitch`) | 全ノードの eth1。etcd のピア通信 |
 
 グローバルIPの割り当て (`terraform/locals.tf`):
@@ -45,8 +48,12 @@ ictsc-k8s-dev/
 ip_addresses[0 .. cp-1]           control plane
 ip_addresses[cp]                  Kubernetes API VIP  (Talos の shared VIP)
 ip_addresses[cp+1]                Ingress VIP         (Cilium LB IPAM + L2 Announcement)
-ip_addresses[cp+2 ..]             worker node
+ip_addresses[cp+2 .. cp+1+wk]     worker node
+ip_addresses[cp+2+wk]             踏み台
 ```
+
+必要なグローバルIP数は `cp + worker + 3` (VIP 2個 + 踏み台 1個)。
+netmask は後から変更できない (`terraform/vars.tf` の WARNING を参照) ので余裕を持たせている。
 
 ### Talos の設定をどうやってノードに届けるか
 
@@ -197,6 +204,21 @@ GitHub App (または OAuth App) は `./init.sh` より先に用意しておく�
 `.envrc` に足して `direnv allow` するか `task reset-env` でやり直す。
 `argocd-repo-key` は `gh` で deploy key を登録するので、リポジトリの admin 権限が要る。
 どちらも作成済みなら status 判定でスキップされる。
+
+> [!WARNING]
+> **`terraform apply` がサーバ作成中にタイムアウトや 409 で落ちたら、孤児サーバを疑うこと。**
+> ゾーンが混んでいるとサーバ作成に数十分かかることがあり、さくら側では作成が完了して
+> いるのに Terraform が ID を state に書く前に落ちる場合がある。再 apply すると
+> `res_already_connected` (ディスクが state 外のサーバに繋がっている) で必ず失敗する。
+>
+> 作り直す必要はない。`terraform state show sakura_disk.worker_node[N]` の `server_id` が
+> 孤児サーバの ID なので、実物を API で確認したうえで import すればよい。
+>
+> ```console
+> $ terraform state show 'sakura_disk.worker_node[2]' | grep server_id
+> $ terraform import 'sakura_server.worker_node[2]' <その server_id>
+> $ terraform plan   # computed 属性と timeouts だけの差分になるので apply して落ち着かせる
+> ```
 
 > [!NOTE]
 > `manifest/envs/<env>/resources/` は `bootstrap-cluster` では撒かない。
