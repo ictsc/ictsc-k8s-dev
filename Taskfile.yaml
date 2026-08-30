@@ -196,6 +196,41 @@ tasks:
       - mkdir -p talos/build
       - cd terraform && terraform output -json talos_input > {{.TF_INPUT_JSON}}
       - ./talos/scripts/gen-config.sh {{.TF_INPUT_JSON}}
+      # 生成した PKI が「今動いているクラスタのもの」か実際に通信して確かめる。
+      #
+      # ファイルの有無だけでは足りない。secrets.yaml が *存在するが別物* という
+      # 状態 (別マシンで一度生成してしまった後など) は素通りしてしまい、
+      # そのまま apply すると CD-ROM が別 CA の config で上書きされる。
+      # 生成された talosconfig で control plane に繋がるかどうかが唯一の確実な判定。
+      - |
+        set -eu
+        if ! (cd terraform && terraform state list 2>/dev/null) | grep -q '^sakura_server\.'; then
+          exit 0   # まだクラスタが無い (初回構築) ので検証しようがない
+        fi
+        cd terraform
+        EP=$(terraform output -json control_plane_ips | jq -r '.[0]')
+        NODE=$(terraform output -json talos_input \
+          | jq -r '[.nodes[] | select(.role=="controlplane") | .internal_ip][0]')
+        cd ..
+        if talosctl --talosconfig talos/talosconfig -n "${NODE}" -e "${EP}" \
+             version --short >/dev/null 2>&1; then
+          echo "==> 生成した設定で control plane に到達できました"
+          exit 0
+        fi
+        echo "ERROR: 生成した talosconfig で control plane に到達できません" >&2
+        echo "" >&2
+        echo "  talos/secrets.yaml が、今動いているクラスタのものと違う可能性が高いです。" >&2
+        echo "  このまま apply すると CD-ROM が別 CA の machine config で上書きされ、" >&2
+        echo "  ノードが再ブートストラップした時点でクラスタに参加できなくなります。" >&2
+        echo "" >&2
+        echo "  構築したマシンから secrets.yaml を持ってきて、やり直してください:" >&2
+        echo "" >&2
+        echo "    scp <構築したマシン>:<リポジトリ>/talos/secrets.yaml talos/secrets.yaml" >&2
+        echo "    rm -rf talos/build talos/talosconfig" >&2
+        echo "" >&2
+        echo "  (クラスタが停止中／ネットワーク不通でもこのエラーになります。" >&2
+        echo "   その場合は疎通を回復してから再実行してください)" >&2
+        exit 1
 
   lint-terraform:
     desc: TerraformのLintを実行
