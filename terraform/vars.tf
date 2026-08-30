@@ -108,7 +108,7 @@ variable "talos_version" {
 variable "kubernetes_version" {
   type        = string
   description = "新しく作るクラスタの Kubernetes バージョン"
-  default     = "1.36.3"
+  default     = "1.36.4"
 }
 
 variable "pod_subnet" {

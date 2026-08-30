@@ -82,28 +82,77 @@ aqua より前に手で入れる**必要がある (`init.sh` が `task init` を
 
 ### 1. ブートストラップ用のツール (手で入れる)
 
+aqua 管理外なのは3つだけ。
+
+| ツール | なぜ aqua 管理外か |
+| --- | --- |
+| `aqua` | 以降のツールを入れる本体 |
+| `direnv` | シェルの hook を rc ファイルに仕込む必要があり、リポジトリ単位の管理に馴染まない |
+| `zstd` | aqua の標準レジストリに無い。`talos/scripts/fetch-image.sh` が Talos イメージの展開に使う |
+
+`task` も `init.sh` より前に必要だが、**`aqua.yaml` に入れてあるので `aqua install` で入る**
+(下記の手順を参照)。別途インストールしなくてよい。
+
+#### macOS
+
 ```console
-$ brew install aqua go-task direnv zstd
+$ brew install aqua direnv zstd
 ```
 
-| ツール | 入れ方 | なぜ aqua 管理外か |
-| --- | --- | --- |
-| `aqua` | `brew install aqua` / [公式ドキュメント](https://aquaproj.github.io/docs/install) | 以降のツールを入れる本体 |
-| `task` | `brew install go-task` / [公式ドキュメント](https://taskfile.dev/ja-JP/installation/) | `init.sh` が `task init` を叩くので `aqua install` より前に要る |
-| `direnv` | `brew install direnv` / [公式ドキュメント](https://github.com/direnv/direnv/blob/master/docs/installation.md) | シェルの hook を `.zshrc` に仕込む必要があり、リポジトリ単位の管理に馴染まない |
-| `zstd` | `brew install zstd` | aqua の標準レジストリに無い。`talos/scripts/fetch-image.sh` が Talos イメージの展開に使う |
+#### Linux
 
-`aqua` と `direnv` はシェルの設定が要る。`.zshrc` (bash なら `.bashrc`) に以下を入れておくこと。
+`aqua` は [公式ドキュメント](https://aquaproj.github.io/docs/install) の方法で入れる。
+Go があるなら一番手軽:
+
+```console
+$ go install github.com/aquaproj/aqua/v2/cmd/aqua@latest
+```
+
+Go を入れたくなければ [GitHub Releases](https://github.com/aquaproj/aqua/releases) から
+バイナリを落として PATH の通った場所に置く。
+
+`direnv` と `zstd` はディストリのパッケージにある。
+
+```console
+# Debian / Ubuntu
+$ sudo apt install -y direnv zstd
+
+# Fedora / RHEL
+$ sudo dnf install -y direnv zstd
+
+# Arch
+$ sudo pacman -S --needed direnv zstd
+```
+
+#### シェルの設定 (macOS / Linux 共通)
+
+`aqua` と `direnv` はどちらもシェルの設定が要る。`.zshrc` (bash なら `.bashrc`) に:
 
 ```bash
-export PATH="$(aqua root-dir)/bin:$PATH"
+# zsh の場合
+export PATH="${AQUA_ROOT_DIR:-${XDG_DATA_HOME:-$HOME/.local/share}/aquaproj-aqua}/bin:$PATH"
 eval "$(direnv hook zsh)"
 ```
 
+```bash
+# bash の場合
+export PATH="${AQUA_ROOT_DIR:-${XDG_DATA_HOME:-$HOME/.local/share}/aquaproj-aqua}/bin:$PATH"
+eval "$(direnv hook bash)"
+```
+
 > [!NOTE]
-> `task` は `aqua.yaml` にも入れてある。上記の PATH を通しておけば、
-> `aqua install` 後は aqua 側の `task` (バージョン固定された方) が優先される。
-> brew 版はあくまで初回の呼び水。
+> PATH は `$(aqua root-dir)` と書いてもよいが、それだと `aqua` 自身が先に PATH に
+> 通っている必要がある。上の `${AQUA_ROOT_DIR:-...}` 形式なら aqua を実行せずに
+> 展開できるので、`go install` で入れた直後でもそのまま動く。
+
+設定を反映したら、リポジトリ直下で `aqua install` を先に叩く。ここで `task` が入る。
+
+```console
+$ aqua install
+$ task --version    # aqua 側の task が引ければ OK
+```
+
+これで「必要なツール」は揃うので、あとは `./init.sh` に進める。
 
 ### 2. aqua で入るツール
 
@@ -484,6 +533,56 @@ apiserver → controller-manager → scheduler → kubelet の順序まで自前
 > `--to` を省くと talosctl 自身が持つ既定値になる。talosctl v1.13.8 の既定は
 > **1.36.2** で、いま動いているのは 1.36.3 のため、省略すると *ダウングレード* になる。
 > そのため `TO` は必須にしてある。
+
+### リンク名が変わることがある (実例: v1.13.8 -> v1.13.9)
+
+Talos は OS のバージョンでネットワークインターフェースの名前を変えることがある。
+実際 **v1.13.9 で `eth0`/`eth1` から `ens3`/`ens4` に変わった**。
+名前に依存した設定は、OS を上げた瞬間に静かに壊れる。
+
+**machine config 側**は名前ではなく **PCI バスパス**で選んでいる
+(`talos/scripts/gen-config.sh`)。バスパスは Terraform が NIC を繋ぐ順序
+(0 = グローバル / 1 = 内部) で決まり、Talos のバージョンでは変わらない。
+
+```yaml
+- deviceSelector:
+    busPath: "0000:00:03.0"   # グローバル (eth0 / ens3)
+- deviceSelector:
+    busPath: "0000:00:04.0"   # 内部 (eth1 / ens4)
+```
+
+MAC でも選べるが、MAC はサーバを作った後にしか分からない。ISO を先に焼くこの構成
+(`apply-network` -> `talos-config` -> `apply-terraform`) では使えない。
+
+> [!WARNING]
+> **Cilium はインターフェースを名前でしか選べない。**
+> `manifest/envs/<env>/resources/cilium-l2-announcement.yaml` の `interfaces` は
+> `^(eth0|ens3)$` のように新旧どちらも許容しておくこと。
+> 片方だけだと全ノードを上げ終わった瞬間に Ingress VIP の広報が止まり、
+> **外部から一切到達できなくなる**。しかも Gateway の `PROGRAMMED` は `True` の
+> ままなので気づきにくい。
+
+名前で書いてしまっていた場合、上げたノードはこうなる。**ノード自体は正常に
+起動していて apid も応答する**ので、ハングと勘違いしやすい。
+
+| 症状 | 理由 |
+| --- | --- |
+| グローバル IP に ping も talosctl も通らない | 静的アドレスがどのリンクにも適用されず、グローバル側が素のまま |
+| `kubectl get node` が NotReady | kubelet が API にも DNS にも届かない |
+| 内部セグメントの DHCP レンジ (`192.168.100.200-250`) に居る | 設定が当たらず DHCP にフォールバックし、踏み台からリースを貰う |
+| `talosctl --insecure` が `tls: certificate required` | maintenance mode ではなく、config は入っている |
+
+復旧は **再起動不要**。踏み台から DHCP レンジを ping で走査してノードを見つけ、
+バスパス版の config を当てるだけでよい。
+
+```console
+$ ssh <踏み台> 'for i in $(seq 200 250); do ping -c1 -W1 192.168.100.$i >/dev/null 2>&1 && echo 192.168.100.$i; done'
+$ talosctl -n <見つけたIP> -e <別のcpのグローバルIP> apply-config -f talos/build/<cluster>/config/<hostname>.yaml
+```
+
+> [!NOTE]
+> 上げる前に、**全ノードへ先にバスパス版の config を当てておく**と壊れない。
+> config の適用は再起動を伴わず、古い Talos (eth0/eth1) でも同じ NIC にマッチする。
 
 ### 更新後にバージョン表記を揃える
 

@@ -9,7 +9,7 @@ packages:
   - name: siderolabs/talos@v1.13.9 # talosctl
   - name: hashicorp/terraform@v1.13.2
   - name: terraform-linters/tflint@v0.64.0
-  - name: kubernetes/kubernetes/kubectl@v1.36.3
+  - name: kubernetes/kubernetes/kubectl@v1.36.4
   - name: helm/helm@v3.21.3
   - name: go-task/task@v3.52.0
   - name: jqlang/jq@jq-1.8.2
