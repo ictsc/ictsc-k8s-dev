@@ -5,7 +5,7 @@ env:
   KUBECONFIG: '{{.ROOT_DIR}}/.kube/config'
 
 vars:
-  TALOS_VERSION: v1.13.8
+  TALOS_VERSION: v1.13.9
   TF_INPUT_JSON: '{{.ROOT_DIR}}/talos/build/talos-input.json'
   # Gateway API の CRD。ExternalAuth フィルタ (GEP-1494) を使うので
   # standard ではなく experimental チャネルを入れる必要がある。
@@ -347,7 +347,7 @@ tasks:
       - helm repo add argo https://argoproj.github.io/argo-helm
       - helm repo update cilium argo
       - >-
-        helm upgrade --install cilium cilium/cilium --version 1.20.0
+        helm upgrade --install cilium cilium/cilium --version 1.20.1
         --namespace kube-system
         -f manifest/base/cilium/values.yaml
         -f manifest/envs/{{.ENV}}/values/cilium.yaml

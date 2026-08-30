@@ -165,8 +165,21 @@ for i in $(seq 0 $((node_count - 1))); do
     echo "  network:"
     echo "    nameservers:"
     for ns in ${nameservers}; do echo "      - ${ns}"; done
+    # インターフェースは名前ではなく PCI バスパスで選ぶ。
+    #
+    # Talos v1.13.9 でリンク名の既定が eth0/eth1 から ens3/ens4 に変わった。
+    # 名前で書いていると、OS を上げた瞬間にどのリンクにもマッチしなくなり、
+    # 静的 IP が一切適用されないまま DHCP にフォールバックする
+    # (グローバル側はアドレス無し = 到達不能、内部側は踏み台の DHCP レンジを掴む)。
+    # config 自体は入っているので apid は動くが、API VIP も kubelet も上がらない。
+    #
+    # バスパスは NIC の接続順で決まり、Terraform の network_interface の順序
+    # (0 = グローバル / 1 = 内部) と一致する。名前と違って Talos のバージョンでは
+    # 変わらないので、こちらを使う。MAC でも選べるが、MAC はサーバ作成後にしか
+    # 分からず、ISO を先に焼くこの構成では使えない。
     echo "    interfaces:"
-    echo "      - interface: eth0"
+    echo "      - deviceSelector:"
+    echo "          busPath: \"0000:00:03.0\""
     echo "        addresses:"
     echo "          - ${external_ip}/${external_netmask}"
     echo "        routes:"
@@ -177,7 +190,8 @@ for i in $(seq 0 $((node_count - 1))); do
       echo "        vip:"
       echo "          ip: ${api_vip}"
     fi
-    echo "      - interface: eth1"
+    echo "      - deviceSelector:"
+    echo "          busPath: \"0000:00:04.0\""
     echo "        addresses:"
     echo "          - ${internal_ip}/${internal_netmask}"
     echo "  kubelet:"

@@ -1,4 +1,13 @@
-# eth0 (さくらのクラウドのルータ+スイッチ側) で LoadBalancer IP を ARP 広報する
+# グローバル側 (さくらのクラウドのルータ+スイッチ) の NIC で LoadBalancer IP を ARP 広報する。
+#
+# リンク名は Talos のバージョンで変わる。v1.13.8 までは eth0 だったが、v1.13.9 で
+# 予測可能な名前 (ens3) が既定になった。片方しか書いていないと、OS を上げた瞬間に
+# どのノードもマッチしなくなり、Ingress VIP が広報されなくなって外部から一切
+# 到達できなくなる (Gateway の PROGRAMMED は True のままなので気づきにくい)。
+# 混在期間もあるため両方を許容する。
+#
+# machine config 側はインターフェースを PCI バスパスで選んでいる
+# (talos/scripts/gen-config.sh) が、Cilium は名前でしか選べないためここは名前で書く。
 apiVersion: cilium.io/v2alpha1
 kind: CiliumL2AnnouncementPolicy
 metadata:
@@ -7,6 +16,6 @@ metadata:
     argocd.argoproj.io/sync-wave: "-25"
 spec:
   interfaces:
-    - ^eth0$
+    - ^(eth0|ens3)$
   externalIPs: true
   loadBalancerIPs: true
