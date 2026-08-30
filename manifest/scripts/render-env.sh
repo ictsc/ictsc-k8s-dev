@@ -283,7 +283,12 @@ reclaimPolicy: Delete
 volumeBindingMode: Immediate
 allowVolumeExpansion: true
 mountOptions:
-  - nfsvers=4.1
+  # さくらの NFS アプライアンスは NFSv4.0 まで。実測:
+  #   4.1 -> mount.nfs: Protocol not supported
+  #   4.0 -> 成功
+  #   3   -> rpc.statd が要る (CSI の node コンテナには居ない)
+  # csi-driver-nfs の既定は 4.1 なので、明示しないとプロビジョニングが失敗する。
+  - nfsvers=4.0
   - hard
   - noatime
 EOF
