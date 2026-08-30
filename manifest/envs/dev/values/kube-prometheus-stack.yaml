@@ -1,0 +1,7 @@
+# このファイルは `task render-env-values` が terraform output から生成する
+grafana:
+  # oauth2-proxy の後ろに置くので、Grafana 自身が生成する URL を実ホスト名に合わせる
+  grafana.ini:
+    server:
+      domain: grafana.k8s-dev.ictsc.net
+      root_url: https://grafana.k8s-dev.ictsc.net

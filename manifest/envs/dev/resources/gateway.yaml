@@ -68,3 +68,4 @@ spec:
     - argocd.k8s-dev.ictsc.net
     - dex.k8s-dev.ictsc.net
     - httpbin.k8s-dev.ictsc.net
+    - grafana.k8s-dev.ictsc.net

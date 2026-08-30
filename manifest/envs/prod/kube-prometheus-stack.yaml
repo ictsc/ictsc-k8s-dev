@@ -21,6 +21,7 @@ spec:
         skipCrds: false
         valueFiles:
           - $values/manifest/base/kube-prometheus-stack/values.yaml
+          - $values/manifest/envs/prod/values/kube-prometheus-stack.yaml
     - repoURL: git@github.com:ictsc/ictsc-k8s-dev.git
       targetRevision: main
       ref: values

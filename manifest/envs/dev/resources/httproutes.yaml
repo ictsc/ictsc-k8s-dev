@@ -89,6 +89,72 @@ spec:
         - name: httpbin
           port: 8080
 ---
+# Grafana も自前のログイン画面を持つが、oauth2-proxy を前段に置いて
+# GitHub org のメンバーだけに絞る。
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: grafana
+  namespace: monitoring
+  annotations:
+    argocd.argoproj.io/sync-wave: "10"
+spec:
+  parentRefs:
+    - name: external
+      namespace: gateway
+      sectionName: https
+  hostnames:
+    - grafana.k8s-dev.ictsc.net
+  rules:
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /oauth2
+      backendRefs:
+        - name: oauth2-proxy
+          namespace: oauth2-proxy
+          port: 80
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /
+      filters:
+        - type: ExternalAuth
+          externalAuth:
+            protocol: HTTP
+            backendRef:
+              kind: Service
+              name: oauth2-proxy
+              namespace: oauth2-proxy
+              port: 80
+            http:
+              allowedHeaders:
+                - Cookie
+                - X-Forwarded-Proto
+                - X-Forwarded-Host
+              allowedResponseHeaders:
+                - Set-Cookie
+                - X-Auth-Request-User
+                - X-Auth-Request-Email
+      backendRefs:
+        - name: kube-prometheus-stack-grafana
+          port: 80
+---
+apiVersion: gateway.networking.k8s.io/v1beta1
+kind: ReferenceGrant
+metadata:
+  name: grafana-to-oauth2-proxy
+  namespace: oauth2-proxy
+spec:
+  from:
+    - group: gateway.networking.k8s.io
+      kind: HTTPRoute
+      namespace: monitoring
+  to:
+    - group: ""
+      kind: Service
+      name: oauth2-proxy
+---
 apiVersion: gateway.networking.k8s.io/v1beta1
 kind: ReferenceGrant
 metadata:

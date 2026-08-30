@@ -67,6 +67,16 @@ server:
     type: ClusterIP
 EOF
 
+cat > "${d}/values/kube-prometheus-stack.yaml" <<EOF
+${gen}
+grafana:
+  # oauth2-proxy の後ろに置くので、Grafana 自身が生成する URL を実ホスト名に合わせる
+  grafana.ini:
+    server:
+      domain: grafana.${domain}
+      root_url: https://grafana.${domain}
+EOF
+
 cat > "${d}/values/oauth2-proxy.yaml" <<EOF
 ${gen}
 extraArgs:
@@ -114,6 +124,7 @@ config:
       # 保護対象アプリを増やしたらここに <host>/oauth2/callback を足す
       redirectURIs:
         - https://httpbin.${domain}/oauth2/callback
+        - https://grafana.${domain}/oauth2/callback
     - id: argocd
       name: Argo CD
       secretEnv: ARGOCD_CLIENT_SECRET
@@ -221,6 +232,7 @@ spec:
     - argocd.${domain}
     - dex.${domain}
     - httpbin.${domain}
+    - grafana.${domain}
 EOF
 
 cat > "${d}/resources/cluster-issuer.yaml" <<EOF
@@ -416,6 +428,72 @@ spec:
       backendRefs:
         - name: httpbin
           port: 8080
+---
+# Grafana も自前のログイン画面を持つが、oauth2-proxy を前段に置いて
+# GitHub org のメンバーだけに絞る。
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: grafana
+  namespace: monitoring
+  annotations:
+    argocd.argoproj.io/sync-wave: "10"
+spec:
+  parentRefs:
+    - name: external
+      namespace: gateway
+      sectionName: https
+  hostnames:
+    - grafana.${domain}
+  rules:
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /oauth2
+      backendRefs:
+        - name: oauth2-proxy
+          namespace: oauth2-proxy
+          port: 80
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /
+      filters:
+        - type: ExternalAuth
+          externalAuth:
+            protocol: HTTP
+            backendRef:
+              kind: Service
+              name: oauth2-proxy
+              namespace: oauth2-proxy
+              port: 80
+            http:
+              allowedHeaders:
+                - Cookie
+                - X-Forwarded-Proto
+                - X-Forwarded-Host
+              allowedResponseHeaders:
+                - Set-Cookie
+                - X-Auth-Request-User
+                - X-Auth-Request-Email
+      backendRefs:
+        - name: kube-prometheus-stack-grafana
+          port: 80
+---
+apiVersion: gateway.networking.k8s.io/v1beta1
+kind: ReferenceGrant
+metadata:
+  name: grafana-to-oauth2-proxy
+  namespace: oauth2-proxy
+spec:
+  from:
+    - group: gateway.networking.k8s.io
+      kind: HTTPRoute
+      namespace: monitoring
+  to:
+    - group: ""
+      kind: Service
+      name: oauth2-proxy
 ---
 apiVersion: gateway.networking.k8s.io/v1beta1
 kind: ReferenceGrant
