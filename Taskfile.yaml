@@ -484,6 +484,113 @@ tasks:
     cmds:
       - kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath='{.data.password}' | base64 -d && echo
 
+  ########################################
+  # アップグレード
+  ########################################
+  #
+  # WARNING: terraform/vars.tf の talos_version を上げても OS は上がらない。
+  #          あれは「これから作るノードのディスクの元になるアーカイブ」であって、
+  #          稼働中のノードには一切影響しない (sakura_disk は ignore_changes で
+  #          守ってある)。OS の更新は必ずこの upgrade-talos で行うこと。
+
+  upgrade-talos:
+    desc: 'Talos OS を1台ずつ更新 (例: task upgrade-talos TO=v1.13.9)'
+    deps:
+      - task: check-binary
+        vars:
+          BINARY: talosctl
+          INSTALL_DOC: "aqua install で導入されます (aqua.yaml を参照)"
+    cmds:
+      - |
+        set -eu
+        TO="{{.TO}}"
+        if [ -z "${TO}" ]; then
+          echo "ERROR: TO を指定してください (例: task upgrade-talos TO=v1.13.9)" >&2
+          exit 1
+        fi
+
+        cd terraform
+        INPUT=$(terraform output -json talos_input)
+        cd ..
+
+        # control plane を先に、その後 worker。どちらも1台ずつ。
+        # cp を並列で落とすと etcd の quorum を失う。
+        CP_EXT=$(echo "${INPUT}" | jq -r '[.nodes[] | select(.role=="controlplane") | .external_ip] | join(" ")')
+        ORDER=$(echo "${INPUT}" | jq -r '
+          ([.nodes[] | select(.role=="controlplane")] + [.nodes[] | select(.role=="worker")])
+          | .[] | "\(.hostname) \(.internal_ip) \(.external_ip)"')
+
+        echo "==> ${TO} へ更新します"
+        echo "${ORDER}" | awk '{print "    " $1 " (" $2 ")"}'
+        echo
+
+        echo "${ORDER}" | while read -r HOST INTERNAL EXTERNAL; do
+          # 対象ノード自身を endpoint にすると再起動で経路が切れる。別の cp を使う。
+          EP=""
+          for c in ${CP_EXT}; do
+            [ "${c}" = "${EXTERNAL}" ] && continue
+            EP="${c}"; break
+          done
+
+          echo "==> ${HOST} を更新 (endpoint: ${EP})"
+          # --drain は既定 true なので cordon + evict は talosctl がやる
+          talosctl -n "${INTERNAL}" -e "${EP}" upgrade \
+            -i "ghcr.io/siderolabs/installer:${TO}"
+
+          echo "==> ${HOST} が Ready になるのを待つ"
+          until [ "$(kubectl get node "${HOST}" -o jsonpath='{.status.conditions[?(@.type=="Ready")].status}' 2>/dev/null)" = "True" ]; do
+            sleep 10
+          done
+          # 正常時は Talos が uncordon するが、取りこぼしても困るので念のため
+          kubectl uncordon "${HOST}" >/dev/null 2>&1 || true
+          echo "==> ${HOST} OK"
+          echo
+        done
+
+        echo "==> 全ノードの更新が完了しました"
+        echo "    aqua.yaml の siderolabs/talos と terraform/vars.tf の talos_version も"
+        echo "    ${TO} に揃えておくこと (新しいノードを作るときの元になります)"
+
+  upgrade-k8s:
+    desc: 'Kubernetes を更新 (例: task upgrade-k8s TO=1.36.4)'
+    deps:
+      - task: check-binary
+        vars:
+          BINARY: talosctl
+          INSTALL_DOC: "aqua install で導入されます (aqua.yaml を参照)"
+    cmds:
+      # talosctl upgrade-k8s は1回で全ノードを面倒みる (apiserver -> controller-manager
+      # -> scheduler -> kubelet の順序も、イメージの事前 pull も自前でやる)。
+      # ノードごとにループする必要はない。
+      #
+      # NOTE: --to を省くと talosctl 自身が持つ既定値になる。v1.13.8 の既定は 1.36.2 で、
+      #       現在動いているのは 1.36.3 のため、省略すると *ダウングレード* になる。
+      #       そのため TO は必須にしてある。
+      - |
+        set -eu
+        TO="{{.TO}}"
+        if [ -z "${TO}" ]; then
+          echo "ERROR: TO を指定してください (例: task upgrade-k8s TO=1.36.4)" >&2
+          echo "       マイナーは1つずつ上げること (1.36 -> 1.37 -> 1.38)。" >&2
+          echo "       パッチは飛ばしてよい (1.36.1 -> 1.36.4)。" >&2
+          exit 1
+        fi
+
+        cd terraform
+        EP=$(terraform output -json control_plane_ips | jq -r '.[0]')
+        CP1=$(terraform output -json talos_input \
+          | jq -r '[.nodes[] | select(.role=="controlplane") | .internal_ip][0]')
+        cd ..
+
+        echo "==> 計画 (dry-run)"
+        talosctl -n "${CP1}" -e "${EP}" upgrade-k8s --to "${TO}" --dry-run
+        echo
+        echo "==> 実行"
+        talosctl -n "${CP1}" -e "${EP}" upgrade-k8s --to "${TO}"
+        echo
+        echo "==> 完了。terraform/vars.tf の kubernetes_version と"
+        echo "    aqua.yaml の kubectl も ${TO} に揃えておくこと"
+
   up:
     desc: ゼロからクラスタが立ち上がるまで一気にやる
     cmds:

@@ -87,14 +87,27 @@ variable "admin_source_networks" {
 # Talos / Kubernetes
 ########################################
 
+# WARNING: ここを上げても稼働中のノードの OS は上がらない。
+#          これは「これから作るノードのディスクの元になるアーカイブ」の指定であって、
+#          既存ノードには影響しない (sakura_disk 側で ignore_changes して守ってある。
+#          守っていないと全ディスクが作り直しになり、etcd も machine config も消える)。
+#
+#          OS を上げるときは talosctl を使うこと:
+#            task upgrade-talos TO=v1.13.9
+#          その後この値と aqua.yaml の siderolabs/talos も揃えておく。
 variable "talos_version" {
   type    = string
   default = "v1.13.8"
 }
 
+# talos_version と同じく、ここを変えても稼働中のクラスタは上がらない。
+# Kubernetes を上げるときは talosctl に任せること:
+#   task upgrade-k8s TO=1.36.4
+# なお talosctl v1.13.8 の既定値は 1.36.2 なので、--to を省くと
+# 現在の 1.36.3 からダウングレードになる。task 側で TO を必須にしてある。
 variable "kubernetes_version" {
   type        = string
-  description = "Talos v1.13.8 の既定は 1.36.2"
+  description = "新しく作るクラスタの Kubernetes バージョン"
   default     = "1.36.3"
 }
 

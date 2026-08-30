@@ -425,6 +425,80 @@ $ cat ~/.kube/cache/oidc-login/* | jq -r .id_token \
 > `1/1 Running` になったのを確認してから次へ進むこと。3台同時にやると
 > etcd の quorum を失う。
 
+## アップグレード
+
+> [!CAUTION]
+> **`terraform/vars.tf` の `talos_version` / `kubernetes_version` を上げても
+> 稼働中のクラスタは上がらない。** これらは「これから作るノード」の指定であって、
+> 既存ノードには効かない。
+>
+> しかも `talos_version` は、素のままだと **全ディスクを作り直す** plan を作る
+> (`source_archive_id` が変わるため)。ディスクを作り直すと etcd も Talos の
+> STATE パーティション (machine config 本体) も消えるので、クラスタは全損する。
+> いまは `sakura_disk` に `ignore_changes = [source_archive_id]` を入れて
+> 防いであるが、**この lifecycle ブロックを外さないこと**。
+
+更新の経路は3系統ある。それぞれ独立していて、Terraform は OS/Kubernetes の
+更新に一切関与しない。
+
+| 対象 | やり方 |
+| --- | --- |
+| Talos OS | `task upgrade-talos TO=v1.13.9` |
+| Kubernetes | `task upgrade-k8s TO=1.36.4` |
+| Cilium / cert-manager などの Helm チャート | `manifest/envs/<env>/*.yaml` の `targetRevision` を上げて push (Argo CD が反映) |
+
+### Talos OS
+
+```console
+$ task upgrade-talos TO=v1.13.9
+```
+
+`talosctl upgrade` を **control plane から1台ずつ** 実行する。cp を並列で落とすと
+etcd の quorum を失うため、1台が Ready に戻るまで次へ進まない。
+cordon と evict は `talosctl upgrade` が自前でやる (`--drain` が既定 true)。
+対象ノード自身を endpoint にすると再起動で経路が切れるので、別の cp を経由する。
+
+machine config は STATE パーティションに残るので消えない。
+
+> [!NOTE]
+> schematic に system extension を足した場合は、installer イメージを
+> `ghcr.io/siderolabs/installer` ではなく
+> `factory.talos.dev/installer/<schematic>` に変える必要がある。
+> 現在の schematic は `customization: {}` (拡張なし) なので素の installer で等価。
+
+### Kubernetes
+
+```console
+$ task upgrade-k8s TO=1.36.4
+```
+
+`talosctl upgrade-k8s` は **1回叩くだけで全ノードを面倒みる**。ノードの自動検出、
+Talos とのバージョン互換性チェック、イメージの事前 pull、
+apiserver → controller-manager → scheduler → kubelet の順序まで自前でやるので、
+ノードごとにループする必要はない。task は実行前に `--dry-run` の結果を表示する。
+
+- **マイナーは1つずつ** (1.36 → 1.37 → 1.38)。飛ばせない
+- **パッチは飛ばしてよい** (1.36.1 → 1.36.4)
+
+> [!WARNING]
+> `--to` を省くと talosctl 自身が持つ既定値になる。talosctl v1.13.8 の既定は
+> **1.36.2** で、いま動いているのは 1.36.3 のため、省略すると *ダウングレード* になる。
+> そのため `TO` は必須にしてある。
+
+### 更新後にバージョン表記を揃える
+
+実体の更新とは別に、以下も同じ値にしておくこと。**揃えなくてもクラスタは動くが、
+次にノードを増やしたときだけ古いバージョンで作られる**という分かりにくい状態になる。
+
+| ファイル | 項目 |
+| --- | --- |
+| `aqua.yaml` | `siderolabs/talos` (talosctl 本体)、`kubernetes/kubernetes/kubectl` |
+| `Taskfile.yaml` | `TALOS_VERSION` (イメージ取得) |
+| `terraform/vars.tf` | `talos_version`、`kubernetes_version` |
+
+`talosctl` のバージョンは `upgrade` / `upgrade-k8s` の既定値を決めるので、
+先に `aqua.yaml` を上げて `aqua install` しておくとよい。
+
 ## 秘密情報
 
 - `.envrc.tmpl` — `.envrc` の雛形 (これはコミットする)

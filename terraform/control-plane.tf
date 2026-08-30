@@ -12,6 +12,16 @@ resource "sakura_disk" "control_plane" {
     create = "1h"
     delete = "1h"
   }
+
+  # source_archive_id はディスク作成時にしか使われない。にもかかわらず変更すると
+  # ディスクごと作り直しになり、etcd も Talos の STATE パーティション
+  # (machine config 本体) も消える = クラスタ全損。
+  # OS の更新は talosctl upgrade (task upgrade-talos) で行い、Terraform は関与しない。
+  # ここを無視することで、var.talos_version を上げても既存ノードは作り直されず、
+  # 「これから作る新しいノードだけが新しいアーカイブから作られる」状態になる。
+  lifecycle {
+    ignore_changes = [source_archive_id]
+  }
 }
 
 resource "sakura_server" "control_plane" {
