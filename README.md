@@ -101,34 +101,32 @@ $ brew install aqua direnv zstd
 
 #### Linux
 
-`aqua` は [公式ドキュメント](https://aquaproj.github.io/docs/install) の方法で入れる。
-Go があるなら一番手軽:
+**`./init.sh` が全部やる** ので、通常は手で入れるものは無い。中でやっているのは:
+
+1. `direnv` / `zstd` をディストリのパッケージから導入 (apt / dnf / pacman / zypper)
+2. `aqua` を [GitHub Releases](https://github.com/aquaproj/aqua/releases) から取得
+   (チェックサム検証つき、`~/.local/bin` へ配置)
+3. `.bashrc` / `.zshrc` に PATH と direnv hook を追記 (既に書いてあれば触らない)
+4. `aqua install` -> `task init`
+
+> [!NOTE]
+> `go install github.com/aquaproj/aqua/v2/cmd/aqua@latest` でも入るが、
+> **ツールチェーンの再取得とビルドで数 GB の一時領域を使う**ため、`/tmp` が
+> 小さい VM では `no space left on device` で落ちる。`init.sh` は
+> ビルドしない配布バイナリを取りに行く。
+
+> [!WARNING]
+> **空き容量に注意。** このリポジトリは Talos の raw イメージ (約 4GB) を
+> ダウンロードしてさくらへアップロードする。aqua が入れるツール類も数百 MB ある。
+> `init.sh` は起動時に `/tmp` と `$HOME` の空きを確認して警告する。
+
+手で入れたい場合はこれでよい (arm64 なら `aqua_linux_arm64.tar.gz`)。
 
 ```console
-$ go install github.com/aquaproj/aqua/v2/cmd/aqua@latest
-```
-
-> [!IMPORTANT]
-> `go install` は `$(go env GOPATH)/bin` (既定では `~/go/bin`) にバイナリを置く。
-> ここが PATH に無いと、直後に `aqua` を叩いても `command not found` になる。
-> 下記シェル設定の **`GOPATH/bin` の行** を忘れないこと。
-> (もう1行の `AQUA_ROOT_DIR` は aqua が入れる *ツール* の置き場で、別物)
-
-Go を入れたくなければ [GitHub Releases](https://github.com/aquaproj/aqua/releases) から
-バイナリを落として PATH の通った場所 (`~/.local/bin` など) に置く。その場合は
-`GOPATH/bin` の行は要らない。
-
-`direnv` と `zstd` はディストリのパッケージにある。
-
-```console
-# Debian / Ubuntu
-$ sudo apt install -y direnv zstd
-
-# Fedora / RHEL
-$ sudo dnf install -y direnv zstd
-
-# Arch
-$ sudo pacman -S --needed direnv zstd
+$ mkdir -p ~/.local/bin
+$ curl -sSfL https://github.com/aquaproj/aqua/releases/download/v2.62.3/aqua_linux_amd64.tar.gz \
+    | tar -xz -C ~/.local/bin aqua
+$ export PATH="$HOME/.local/bin:$PATH"
 ```
 
 #### シェルの設定 (macOS / Linux 共通)
@@ -137,14 +135,14 @@ $ sudo pacman -S --needed direnv zstd
 
 ```bash
 # zsh の場合 (.zshrc)
-export PATH="$(go env GOPATH)/bin:$PATH"   # go install で aqua を入れた場合のみ
+export PATH="$HOME/.local/bin:$PATH"        # aqua 本体をここに置いた場合
 export PATH="${AQUA_ROOT_DIR:-${XDG_DATA_HOME:-$HOME/.local/share}/aquaproj-aqua}/bin:$PATH"
 eval "$(direnv hook zsh)"
 ```
 
 ```bash
 # bash の場合 (.bashrc)
-export PATH="$(go env GOPATH)/bin:$PATH"   # go install で aqua を入れた場合のみ
+export PATH="$HOME/.local/bin:$PATH"        # aqua 本体をここに置いた場合
 export PATH="${AQUA_ROOT_DIR:-${XDG_DATA_HOME:-$HOME/.local/share}/aquaproj-aqua}/bin:$PATH"
 eval "$(direnv hook bash)"
 ```
@@ -153,7 +151,7 @@ eval "$(direnv hook bash)"
 
 | PATH | 中身 |
 | --- | --- |
-| `$(go env GOPATH)/bin` | **`aqua` 本体**。`go install` で入れたときだけ必要 |
+| `$HOME/.local/bin` | **`aqua` 本体**の置き場 (`init.sh` はここに置く) |
 | `${AQUA_ROOT_DIR:-...}/bin` | **aqua が入れるツール** (`task` / `terraform` / `kubectl` など) |
 
 > [!NOTE]

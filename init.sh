@@ -37,6 +37,27 @@ case "${OS}" in
 esac
 info "OS=${OS} パッケージマネージャ=${PM}"
 
+# このリポジトリは Talos の raw イメージ (約 4GB) を落として さくら へ上げる。
+# aqua が入れるツール類も数百 MB あるため、空きが少ないと途中で必ず失敗する。
+check_space() {
+  # $1 = 対象パス, $2 = 必要な GB
+  avail_kb="$(df -Pk "$1" 2>/dev/null | awk 'NR==2 {print $4}')" || return 0
+  [ -z "${avail_kb}" ] && return 0
+  need_kb=$(( $2 * 1024 * 1024 ))
+  if [ "${avail_kb}" -lt "${need_kb}" ]; then
+    warn "$1 の空きが $(( avail_kb / 1024 / 1024 ))GB しかありません (目安 $2GB)"
+    return 1
+  fi
+  return 0
+}
+SPACE_OK=0
+check_space "${TMPDIR:-/tmp}" 2 || SPACE_OK=1
+check_space "${HOME}" 10 || SPACE_OK=1
+if [ "${SPACE_OK}" -ne 0 ]; then
+  warn "容量不足のまま進めると、ツールの展開や Talos イメージの取得で失敗します"
+  warn "不要なファイルを消すか、ディスクを増やしてから実行し直してください"
+fi
+
 # sudo が要るか (root なら不要)
 SUDO=""
 [ "$(id -u)" -ne 0 ] && have sudo && SUDO="sudo"
@@ -71,7 +92,7 @@ done
 # aqua が入れるツールの置き場。aqua 自身を実行せずに展開できる形で書く
 # (aqua root-dir を使うと aqua が先に PATH に居る必要がある)。
 AQUA_BIN="${AQUA_ROOT_DIR:-${XDG_DATA_HOME:-${HOME}/.local/share}/aquaproj-aqua}/bin"
-GOPATH_BIN=""
+LOCAL_BIN=""
 
 if have aqua; then
   info "aqua は導入済み ($(command -v aqua))"
@@ -82,12 +103,52 @@ else
       brew install aqua
       ;;
     *)
-      have go || die "aqua の導入には Go が必要です。Go を入れるか、
-  https://github.com/aquaproj/aqua/releases からバイナリを PATH の通った場所に置いてください"
-      go install github.com/aquaproj/aqua/v2/cmd/aqua@latest
-      # go install は $(go env GOPATH)/bin に置く。ここが PATH に無いと直後に叩けない
-      GOPATH_BIN="$(go env GOPATH)/bin"
-      PATH="${GOPATH_BIN}:${PATH}"
+      # 配布バイナリを取る。go install だとツールチェーンの再取得とビルドが走り、
+      # /tmp が小さい環境では "no space left on device" で落ちる。
+      # aqua 自身のバージョンはここで固定する (以降のツールは aqua.yaml が固定)。
+      AQUA_VERSION="v2.62.3"
+      case "$(uname -m)" in
+        x86_64|amd64)  ARCH="amd64" ;;
+        aarch64|arm64) ARCH="arm64" ;;
+        *) die "未対応の CPU アーキテクチャです: $(uname -m)" ;;
+      esac
+      TARBALL="aqua_linux_${ARCH}.tar.gz"
+      URL="https://github.com/aquaproj/aqua/releases/download/${AQUA_VERSION}/${TARBALL}"
+
+      have curl || die "curl が必要です"
+      mkdir -p "${HOME}/.local/bin"
+      TMPD="$(mktemp -d)"
+      # shellcheck disable=SC2064
+      trap "rm -rf '${TMPD}'" EXIT
+
+      info "aqua ${AQUA_VERSION} (${ARCH}) を取得します"
+      curl -sSfL -o "${TMPD}/${TARBALL}" "${URL}" \
+        || die "aqua の取得に失敗しました: ${URL}"
+
+      # 配布物のチェックサムを検証する (照合ツールが無ければ飛ばす)
+      SUMS="aqua_${AQUA_VERSION#v}_checksums.txt"
+      if curl -sSfL -o "${TMPD}/${SUMS}" \
+           "https://github.com/aquaproj/aqua/releases/download/${AQUA_VERSION}/${SUMS}" 2>/dev/null; then
+        if have sha256sum; then
+          ( cd "${TMPD}" && grep " ${TARBALL}\$" "${SUMS}" | sha256sum -c - >/dev/null ) \
+            || die "aqua のチェックサムが一致しません"
+          info "チェックサム OK"
+        elif have shasum; then
+          ( cd "${TMPD}" && grep " ${TARBALL}\$" "${SUMS}" | shasum -a 256 -c - >/dev/null ) \
+            || die "aqua のチェックサムが一致しません"
+          info "チェックサム OK"
+        else
+          warn "sha256sum / shasum が無いのでチェックサムの検証を飛ばします"
+        fi
+      else
+        warn "チェックサムファイルを取得できないので検証を飛ばします"
+      fi
+
+      tar -xzf "${TMPD}/${TARBALL}" -C "${HOME}/.local/bin" aqua \
+        || die "aqua の展開に失敗しました"
+      chmod +x "${HOME}/.local/bin/aqua"
+      LOCAL_BIN="${HOME}/.local/bin"
+      PATH="${LOCAL_BIN}:${PATH}"
       export PATH
       ;;
   esac
@@ -118,9 +179,8 @@ else
   # aqua のツール置き場は "aqua root-dir" 形式で書かれていることもある
   { rc_has "aquaproj-aqua" || rc_has "aqua root-dir"; } || NEED="${NEED} aqua-path"
   rc_has "direnv hook"   || NEED="${NEED} direnv-hook"
-  if [ -n "${GOPATH_BIN}" ]; then
-    # GOPATH/bin は $GOPATH/bin と $(go env GOPATH)/bin の両方の書き方がありうる
-    { rc_has 'GOPATH)/bin' || rc_has '$GOPATH/bin'; } || NEED="${NEED} gopath"
+  if [ -n "${LOCAL_BIN}" ]; then
+    rc_has '.local/bin' || NEED="${NEED} local-bin"
   fi
 
   if [ -z "${NEED}" ]; then
@@ -130,7 +190,7 @@ else
     {
       echo ""
       echo "${MARK}"
-      case "${NEED}" in *gopath*)      echo 'export PATH="$(go env GOPATH)/bin:$PATH"' ;; esac
+      case "${NEED}" in *local-bin*)   echo 'export PATH="$HOME/.local/bin:$PATH"' ;; esac
       case "${NEED}" in *aqua-path*)   echo 'export PATH="${AQUA_ROOT_DIR:-${XDG_DATA_HOME:-$HOME/.local/share}/aquaproj-aqua}/bin:$PATH"' ;; esac
       case "${NEED}" in *direnv-hook*) echo "eval \"\$(direnv hook ${SHELL_NAME})\"" ;; esac
     } >> "${RC}"
