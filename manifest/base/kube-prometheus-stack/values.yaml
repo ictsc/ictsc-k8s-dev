@@ -1,0 +1,83 @@
+# Prometheus / Alertmanager / Grafana と既定のアラートルール一式。
+# 保存先は NFS の StorageClass。20GB しかないので保持量を絞ってある。
+
+# kube-proxy は動かしていない (Cilium の kubeProxyReplacement)
+kubeProxy:
+  enabled: false
+
+# controller-manager / scheduler は talos/patches/controlplane.yaml で
+# bind-address: 0.0.0.0 にしてあるので scrape できる
+kubeControllerManager:
+  enabled: true
+kubeScheduler:
+  enabled: true
+
+# etcd のメトリクスは 2381 (listen-metrics-urls)。既定の 2379 ではない
+kubeEtcd:
+  enabled: true
+  service:
+    port: 2381
+    targetPort: 2381
+
+prometheus:
+  prometheusSpec:
+    retention: 15d
+    retentionSize: 8GB
+    serviceMonitorSelectorNilUsesHelmValues: false
+    podMonitorSelectorNilUsesHelmValues: false
+    ruleSelectorNilUsesHelmValues: false
+    storageSpec:
+      volumeClaimTemplate:
+        spec:
+          accessModes: [ReadWriteOnce]
+          resources:
+            requests:
+              storage: 10Gi
+    resources:
+      requests:
+        cpu: 200m
+        memory: 1Gi
+
+alertmanager:
+  alertmanagerSpec:
+    # task alert-secrets が作る。webhook URL は git に置かない
+    secrets:
+      - alertmanager-discord
+    storage:
+      volumeClaimTemplate:
+        spec:
+          accessModes: [ReadWriteOnce]
+          resources:
+            requests:
+              storage: 1Gi
+  config:
+    route:
+      group_by: [alertname, namespace]
+      group_wait: 30s
+      group_interval: 5m
+      repeat_interval: 12h
+      receiver: discord
+      routes:
+        # 常時発火する死活確認用アラート。通知はしない
+        - matchers: [alertname = "Watchdog"]
+          receiver: "null"
+    receivers:
+      - name: "null"
+      - name: discord
+        discord_configs:
+          - webhook_url_file: /etc/alertmanager/secrets/alertmanager-discord/webhook-url
+            send_resolved: true
+
+grafana:
+  persistence:
+    enabled: true
+    size: 1Gi
+  # 公開は Cilium Gateway API + oauth2-proxy 側で行う
+  ingress:
+    enabled: false
+
+prometheus-node-exporter:
+  tolerations:
+    - key: node-role.kubernetes.io/control-plane
+      operator: Exists
+      effect: NoSchedule

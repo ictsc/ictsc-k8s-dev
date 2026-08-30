@@ -427,6 +427,22 @@ tasks:
         -f manifest/envs/{{.ENV}}/values/argocd.yaml
         --wait --timeout 10m
 
+  alert-secrets:
+    desc: Alertmanager の通知先 (Discord webhook) を Secret にする
+    cmds:
+      - |
+        set -eu
+        if [ -z "${DISCORD_WEBHOOK_URL:-}" ]; then
+          echo "DISCORD_WEBHOOK_URL が設定されていません" >&2
+          echo ".envrc.tmpl を参考に .envrc へ追記して direnv allow するか、task reset-env で作り直してください" >&2
+          exit 1
+        fi
+        kubectl create namespace monitoring --dry-run=client -o yaml | kubectl apply -f - >/dev/null
+        kubectl -n monitoring create secret generic alertmanager-discord \
+          --from-literal=webhook-url="${DISCORD_WEBHOOK_URL}" \
+          --dry-run=client -o yaml | kubectl apply -f - >/dev/null
+        echo "==> monitoring/alertmanager-discord を作成しました"
+
   argocd-repo-key:
     desc: Argo CD が private リポジトリを読むための deploy key を作って GitHub に登録
     deps:

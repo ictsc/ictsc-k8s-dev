@@ -3,6 +3,7 @@ resources:
   - ./cert-manager.yaml
   - ./kubelet-serving-cert-approver.yaml
   - ./csi-driver-nfs.yaml
+  - ./kube-prometheus-stack.yaml
   - ./metrics-server.yaml
   - ./argocd.yaml
   - ./dex.yaml

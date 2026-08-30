@@ -21,3 +21,6 @@ export GITHUB_CLIENT_SECRET="${GITHUB_CLIENT_SECRET}"
 
 # Let's Encrypt の失効通知などが飛ぶ宛先 (task render-env-values が読む)
 export ACME_EMAIL="${ACME_EMAIL}"
+
+# Alertmanager の通知先 (task alert-secrets が読む)
+export DISCORD_WEBHOOK_URL="${DISCORD_WEBHOOK_URL}"
