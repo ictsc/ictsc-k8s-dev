@@ -376,9 +376,10 @@ tasks:
         DOMAIN=$(terraform output -raw domain)
         CLUSTER=$(terraform output -json talos_input | jq -r '.cluster_name')
         POD_SUBNET=$(terraform output -json talos_input | jq -r '.pod_subnet')
+        NFS_IP=$(terraform output -raw nfs_ip)
         cd ..
         ./manifest/scripts/render-env.sh \
-          "${ENV}" "${CLUSTER}" "${DOMAIN}" "${INGRESS_VIP}" '{{.ACME_EMAIL}}' "${POD_SUBNET}"
+          "${ENV}" "${CLUSTER}" "${DOMAIN}" "${INGRESS_VIP}" '{{.ACME_EMAIL}}' "${POD_SUBNET}" "${NFS_IP}"
   install-gateway-api-crds:
     desc: Gateway API の CRD (experimental チャネル) を導入
     cmds:

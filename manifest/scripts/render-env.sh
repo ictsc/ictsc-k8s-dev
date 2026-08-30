@@ -2,15 +2,16 @@
 # terraform output 由来の env 固有の値 (VIP・ドメイン) をマニフェストに流し込む。
 # Taskfile の render-env-values から呼ばれる。
 #
-#   usage: render-env.sh <env> <cluster> <domain> <ingress-vip> <acme-email> <pod-subnet>
+#   usage: render-env.sh <env> <cluster> <domain> <ingress-vip> <acme-email> <pod-subnet> <nfs-ip>
 set -euo pipefail
 
-env="${1:?usage: render-env.sh <env> <cluster> <domain> <ingress-vip> <acme-email> <pod-subnet>}"
+env="${1:?usage: render-env.sh <env> <cluster> <domain> <ingress-vip> <acme-email> <pod-subnet> <nfs-ip>}"
 cluster="${2:?cluster is required}"
 domain="${3:?domain is required}"
 vip="${4:?ingress vip is required}"
 acme_email="${5:?acme email is required}"
 pod_subnet="${6:?pod subnet is required}"
+nfs_ip="${7:?nfs ip is required}"
 
 case "${acme_email}" in
   TODO-*)
@@ -254,6 +255,37 @@ spec:
               - name: external
                 namespace: gateway
                 kind: Gateway
+EOF
+
+cat > "${d}/resources/storageclass-nfs.yaml" <<EOF
+${gen}
+#
+# さくらの NFS アプライアンス (terraform/nfs.tf) を使う StorageClass。
+# サーバは内部セグメントに居るので、ノードからは eth1 経由で見える。
+#
+# csi-driver-nfs が subDir をプロビジョニングする。NFS の共有パスは
+# アプライアンスの既定である /export をそのまま使う。
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: nfs
+  annotations:
+    argocd.argoproj.io/sync-wave: "-1"
+    # クラスタ唯一の StorageClass なので既定にしておく
+    storageclass.kubernetes.io/is-default-class: "true"
+provisioner: nfs.csi.k8s.io
+parameters:
+  server: ${nfs_ip}
+  share: /export
+  # PV ごとに <namespace>-<pvc名>-<pv名> のディレクトリを掘る
+  subDir: \${.PVC.namespace}-\${.PVC.name}-\${.PV.name}
+reclaimPolicy: Delete
+volumeBindingMode: Immediate
+allowVolumeExpansion: true
+mountOptions:
+  - nfsvers=4.1
+  - hard
+  - noatime
 EOF
 
 cat > "${d}/resources/rbac-oidc.yaml" <<EOF

@@ -2,6 +2,7 @@ resources:
   - ./cilium.yaml
   - ./cert-manager.yaml
   - ./kubelet-serving-cert-approver.yaml
+  - ./csi-driver-nfs.yaml
   - ./metrics-server.yaml
   - ./argocd.yaml
   - ./dex.yaml
@@ -11,5 +12,6 @@ resources:
   - ./resources/cilium-l2-announcement.yaml
   - ./resources/gateway.yaml
   - ./resources/cluster-issuer.yaml
+  - ./resources/storageclass-nfs.yaml
   - ./resources/rbac-oidc.yaml
   - ./resources/httproutes.yaml

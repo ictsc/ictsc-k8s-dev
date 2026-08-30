@@ -1,0 +1,19 @@
+# さくらの NFS アプライアンスを PersistentVolume として使うための CSI ドライバ。
+# NFS サーバ自体は Terraform (terraform/nfs.tf) が作る。
+#
+# StorageClass はここでは作らない。NFS の IP が env ごとに違うため、
+# manifest/envs/<env>/resources/storageclass-nfs.yaml を
+# task render-env-values が terraform output から生成している。
+
+controller:
+  replicas: 2
+  # 既定では PV 削除時にデータをアーカイブ(リネーム)して残す。
+  # dev では消えてほしいので false にする。
+  runOnControlPlane: false
+
+# ノード側の DaemonSet は全ノードで動かす (control plane にも Pod が乗りうる)
+node:
+  tolerations:
+    - key: node-role.kubernetes.io/control-plane
+      operator: Exists
+      effect: NoSchedule

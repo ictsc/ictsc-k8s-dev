@@ -1,0 +1,28 @@
+# このファイルは `task render-env-values` が terraform output から生成する
+#
+# さくらの NFS アプライアンス (terraform/nfs.tf) を使う StorageClass。
+# サーバは内部セグメントに居るので、ノードからは eth1 経由で見える。
+#
+# csi-driver-nfs が subDir をプロビジョニングする。NFS の共有パスは
+# アプライアンスの既定である /export をそのまま使う。
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: nfs
+  annotations:
+    argocd.argoproj.io/sync-wave: "-1"
+    # クラスタ唯一の StorageClass なので既定にしておく
+    storageclass.kubernetes.io/is-default-class: "true"
+provisioner: nfs.csi.k8s.io
+parameters:
+  server: 192.168.100.150
+  share: /export
+  # PV ごとに <namespace>-<pvc名>-<pv名> のディレクトリを掘る
+  subDir: ${.PVC.namespace}-${.PVC.name}-${.PV.name}
+reclaimPolicy: Delete
+volumeBindingMode: Immediate
+allowVolumeExpansion: true
+mountOptions:
+  - nfsvers=4.1
+  - hard
+  - noatime
