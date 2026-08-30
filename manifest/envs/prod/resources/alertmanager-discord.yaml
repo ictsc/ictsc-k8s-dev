@@ -1,0 +1,29 @@
+# Alertmanager の通知先。webhook URL は Secret alertmanager-discord から読む
+# (task alert-secrets が .envrc の DISCORD_WEBHOOK_URL から作る)。
+#
+# values.yaml 側の config には書けない。operator の設定パーサは
+# discord_configs.webhook_url_file を知らず、Alertmanager の起動前に弾かれる。
+# CRD の apiURL は Secret 参照なので、URL を git に置かずに済む。
+apiVersion: monitoring.coreos.com/v1alpha1
+kind: AlertmanagerConfig
+metadata:
+  name: discord
+  namespace: monitoring
+  labels:
+    alertmanager: kube-prometheus-stack
+  annotations:
+    argocd.argoproj.io/sync-wave: "-7"
+spec:
+  route:
+    receiver: discord
+    groupBy: [alertname, namespace]
+    groupWait: 30s
+    groupInterval: 5m
+    repeatInterval: 12h
+  receivers:
+    - name: discord
+      discordConfigs:
+        - apiURL:
+            name: alertmanager-discord
+            key: webhook-url
+          sendResolved: true

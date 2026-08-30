@@ -40,9 +40,13 @@ prometheus:
 
 alertmanager:
   alertmanagerSpec:
-    # task alert-secrets が作る。webhook URL は git に置かない
-    secrets:
-      - alertmanager-discord
+    # AlertmanagerConfig を namespace に関係なく拾う。
+    # 既定 (OnNamespace) だと monitoring 名前空間のアラートにしか適用されない。
+    alertmanagerConfigMatcherStrategy:
+      type: None
+    alertmanagerConfigSelector:
+      matchLabels:
+        alertmanager: kube-prometheus-stack
     storage:
       volumeClaimTemplate:
         spec:
@@ -56,17 +60,16 @@ alertmanager:
       group_wait: 30s
       group_interval: 5m
       repeat_interval: 12h
-      receiver: discord
+      # 実際の通知先は AlertmanagerConfig (resources/alertmanager-discord.yaml)。
+      # webhook URL は Secret 参照でないと git に置くことになるため、
+      # operator が Secret を読める CRD 側で定義している。
+      receiver: "null"
       routes:
-        # 常時発火する死活確認用アラート。通知はしない
+        # 常時発火する死活確認用アラート
         - matchers: [alertname = "Watchdog"]
           receiver: "null"
     receivers:
       - name: "null"
-      - name: discord
-        discord_configs:
-          - webhook_url_file: /etc/alertmanager/secrets/alertmanager-discord/webhook-url
-            send_resolved: true
 
 grafana:
   persistence:
