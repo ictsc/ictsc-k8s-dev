@@ -494,8 +494,9 @@ tasks:
         rand() { openssl rand -base64 32 | tr -- '+/' '-_'; }
         O2P_SECRET=$(rand)
         ARGOCD_SECRET=$(rand)
+        GRAFANA_SECRET=$(rand)
 
-        for ns in dex oauth2-proxy argocd; do
+        for ns in dex oauth2-proxy argocd monitoring; do
           kubectl create namespace "${ns}" --dry-run=client -o yaml | kubectl apply -f - >/dev/null
         done
 
@@ -504,6 +505,7 @@ tasks:
           --from-literal=github-client-secret="${GITHUB_CLIENT_SECRET}" \
           --from-literal=oauth2-proxy-client-secret="${O2P_SECRET}" \
           --from-literal=argocd-client-secret="${ARGOCD_SECRET}" \
+          --from-literal=grafana-client-secret="${GRAFANA_SECRET}" \
           --dry-run=client -o yaml | kubectl apply -f - >/dev/null
 
         kubectl -n oauth2-proxy create secret generic oidc \
@@ -518,7 +520,11 @@ tasks:
           | kubectl label -f - --local -o yaml app.kubernetes.io/part-of=argocd \
           | kubectl apply -f - >/dev/null
 
-        echo "==> dex-secrets / oidc / argocd-oidc を作成しました"
+        kubectl -n monitoring create secret generic grafana-oidc \
+          --from-literal=clientSecret="${GRAFANA_SECRET}" \
+          --dry-run=client -o yaml | kubectl apply -f - >/dev/null
+
+        echo "==> dex-secrets / oidc / argocd-oidc / grafana-oidc を作成しました"
 
   start-gitops:
     desc: app-of-apps のルートを適用して Argo CD に引き継ぐ

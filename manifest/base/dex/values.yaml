@@ -27,6 +27,11 @@ envVars:
       secretKeyRef:
         name: dex-secrets
         key: argocd-client-secret
+  - name: GRAFANA_CLIENT_SECRET
+    valueFrom:
+      secretKeyRef:
+        name: dex-secrets
+        key: grafana-client-secret
 
 # 公開は Gateway API の HTTPRoute で行うため Ingress は使わない
 ingress:

@@ -35,6 +35,11 @@ config:
       secretEnv: ARGOCD_CLIENT_SECRET
       redirectURIs:
         - https://argocd.k8s-dev.ictsc.net/auth/callback
+    - id: grafana
+      name: Grafana
+      secretEnv: GRAFANA_CLIENT_SECRET
+      redirectURIs:
+        - https://grafana.k8s-dev.ictsc.net/login/generic_oauth
     # kubectl (kubelogin) 用。CLI にクライアントシークレットは隠せないので
     # public client にして PKCE で守る。redirectURI は kubelogin が
     # ローカルに立てる一時サーバ。既定のポートを両方書いておく。

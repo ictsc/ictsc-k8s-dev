@@ -70,11 +70,32 @@ EOF
 cat > "${d}/values/kube-prometheus-stack.yaml" <<EOF
 ${gen}
 grafana:
-  # oauth2-proxy の後ろに置くので、Grafana 自身が生成する URL を実ホスト名に合わせる
+  # クライアントシークレットは Secret grafana-oidc から環境変数で渡す
+  envValueFrom:
+    GF_AUTH_GENERIC_OAUTH_CLIENT_SECRET:
+      secretKeyRef:
+        name: grafana-oidc
+        key: clientSecret
   grafana.ini:
     server:
       domain: grafana.${domain}
       root_url: https://grafana.${domain}
+    auth:
+      # OIDC だけを入口にする。ローカルの admin は残すが導線からは隠す
+      disable_login_form: false
+      oauth_auto_login: false
+    auth.generic_oauth:
+      enabled: true
+      name: GitHub (Dex)
+      client_id: grafana
+      scopes: openid profile email groups
+      auth_url: https://dex.${domain}/auth
+      token_url: https://dex.${domain}/token
+      api_url: https://dex.${domain}/userinfo
+      # Dex の github connector は groups を "<org>:<team>" で返す
+      # (org 名だけの "ictsc" は返らない)。ロールはここで振り分ける。
+      role_attribute_path: contains(groups[*], 'ictsc:ictsc2026') && 'Admin' || 'Viewer'
+      allow_assign_grafana_admin: true
 EOF
 
 cat > "${d}/values/oauth2-proxy.yaml" <<EOF
@@ -130,6 +151,11 @@ config:
       secretEnv: ARGOCD_CLIENT_SECRET
       redirectURIs:
         - https://argocd.${domain}/auth/callback
+    - id: grafana
+      name: Grafana
+      secretEnv: GRAFANA_CLIENT_SECRET
+      redirectURIs:
+        - https://grafana.${domain}/login/generic_oauth
     # kubectl (kubelogin) 用。CLI にクライアントシークレットは隠せないので
     # public client にして PKCE で守る。redirectURI は kubelogin が
     # ローカルに立てる一時サーバ。既定のポートを両方書いておく。
@@ -429,15 +455,14 @@ spec:
         - name: httpbin
           port: 8080
 ---
-# Grafana も自前のログイン画面を持つが、oauth2-proxy を前段に置いて
-# GitHub org のメンバーだけに絞る。
+# Grafana は Dex と直接 OIDC でやり取りするので oauth2-proxy を挟まない。
+# 挟むと Dex に2回飛ばされて二重ログインになるうえ、Grafana 側で
+# ロールを振り分けるのに必要な groups クレームが受け取れない。
 apiVersion: gateway.networking.k8s.io/v1
 kind: HTTPRoute
 metadata:
   name: grafana
   namespace: monitoring
-  annotations:
-    argocd.argoproj.io/sync-wave: "10"
 spec:
   parentRefs:
     - name: external
@@ -446,54 +471,9 @@ spec:
   hostnames:
     - grafana.${domain}
   rules:
-    - matches:
-        - path:
-            type: PathPrefix
-            value: /oauth2
-      backendRefs:
-        - name: oauth2-proxy
-          namespace: oauth2-proxy
-          port: 80
-    - matches:
-        - path:
-            type: PathPrefix
-            value: /
-      filters:
-        - type: ExternalAuth
-          externalAuth:
-            protocol: HTTP
-            backendRef:
-              kind: Service
-              name: oauth2-proxy
-              namespace: oauth2-proxy
-              port: 80
-            http:
-              allowedHeaders:
-                - Cookie
-                - X-Forwarded-Proto
-                - X-Forwarded-Host
-              allowedResponseHeaders:
-                - Set-Cookie
-                - X-Auth-Request-User
-                - X-Auth-Request-Email
-      backendRefs:
+    - backendRefs:
         - name: kube-prometheus-stack-grafana
           port: 80
----
-apiVersion: gateway.networking.k8s.io/v1beta1
-kind: ReferenceGrant
-metadata:
-  name: grafana-to-oauth2-proxy
-  namespace: oauth2-proxy
-spec:
-  from:
-    - group: gateway.networking.k8s.io
-      kind: HTTPRoute
-      namespace: monitoring
-  to:
-    - group: ""
-      kind: Service
-      name: oauth2-proxy
 ---
 apiVersion: gateway.networking.k8s.io/v1beta1
 kind: ReferenceGrant

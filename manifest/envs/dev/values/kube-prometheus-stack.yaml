@@ -1,7 +1,28 @@
 # このファイルは `task render-env-values` が terraform output から生成する
 grafana:
-  # oauth2-proxy の後ろに置くので、Grafana 自身が生成する URL を実ホスト名に合わせる
+  # クライアントシークレットは Secret grafana-oidc から環境変数で渡す
+  envValueFrom:
+    GF_AUTH_GENERIC_OAUTH_CLIENT_SECRET:
+      secretKeyRef:
+        name: grafana-oidc
+        key: clientSecret
   grafana.ini:
     server:
       domain: grafana.k8s-dev.ictsc.net
       root_url: https://grafana.k8s-dev.ictsc.net
+    auth:
+      # OIDC だけを入口にする。ローカルの admin は残すが導線からは隠す
+      disable_login_form: false
+      oauth_auto_login: false
+    auth.generic_oauth:
+      enabled: true
+      name: GitHub (Dex)
+      client_id: grafana
+      scopes: openid profile email groups
+      auth_url: https://dex.k8s-dev.ictsc.net/auth
+      token_url: https://dex.k8s-dev.ictsc.net/token
+      api_url: https://dex.k8s-dev.ictsc.net/userinfo
+      # Dex の github connector は groups を "<org>:<team>" で返す
+      # (org 名だけの "ictsc" は返らない)。ロールはここで振り分ける。
+      role_attribute_path: contains(groups[*], 'ictsc:ictsc2026') && 'Admin' || 'Viewer'
+      allow_assign_grafana_admin: true
