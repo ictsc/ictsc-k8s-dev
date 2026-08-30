@@ -84,21 +84,24 @@ locals {
   ]
 
   # 一方 apid (50000) はノードを直接操作でき、reset でディスクまで消せる。
-  # ここは踏み台 + var.admin_source_networks に絞る。
-  # さくらのパケットフィルタは SourceNetwork のマスク長を 0〜31 しか受け付けない。
-  # 単一ホストは "/32" を付けずにベタ書きする (API が 400 を返す)。
-  pf_admin_sources = [
-    for cidr in concat([local.bastion_ip], var.admin_source_networks) :
-    trimsuffix(cidr, "/32")
+  # ここは踏み台からのみに絞る。
+  #
+  # 作業端末の IP を許可する変数も用意していたが、tfstate は共有されているのに
+  # 変数はマシンごとのローカルファイルだったため、apply したマシンによって
+  # ルールが増えたり消えたりしていた (CI から apply すると必ず消える)。
+  # 手元から talosctl を打つときは踏み台経由の SSH トンネルを使う。
+  #
+  # NOTE: さくらのパケットフィルタは SourceNetwork のマスク長を 0〜31 しか
+  #       受け付けない。単一ホストは "/32" を付けずに書くこと (API が 400 を返す)。
+  pf_talos_api = [
+    {
+      protocol         = "tcp"
+      source_network   = local.bastion_ip
+      destination_port = "50000"
+      allow            = true
+      description      = "talosctl (apid) — 踏み台からのみ"
+    },
   ]
-
-  pf_talos_api = [for cidr in local.pf_admin_sources : {
-    protocol         = "tcp"
-    source_network   = cidr
-    destination_port = "50000"
-    allow            = true
-    description      = "talosctl (apid)"
-  }]
 
   # trustd。worker が control plane から証明書を受け取るのに使う。
   # apid のサーバ証明書の更新にも必要なので、塞ぐと後から静かに壊れる。

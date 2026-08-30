@@ -16,7 +16,18 @@ spec:
   source:
     repoURL: https://github.com/alex1989hu/kubelet-serving-cert-approver.git
     targetRevision: v0.11.0
-    path: deploy/ha
+    # deploy/ha ではなく standalone を使う。
+    #
+    # ha は 2 レプリカでリーダー選出するが、待機系はリーダーになるまで
+    # :8080 を listen しない。liveness probe がそこを叩くため
+    # "connection refused" で殺され続け、CrashLoopBackOff から抜けられない
+    # (実測: 14時間で 283 回再起動)。リーダー側は正常に動くので機能自体は
+    # 満たされるが、Argo CD が永久に Progressing のままになり、
+    # 本当の異常が埋もれる。
+    #
+    # kubelet の serving 証明書の更新は頻繁ではないので、
+    # 1 レプリカが数十秒落ちても実害はない。
+    path: deploy/standalone
   destination:
     server: https://kubernetes.default.svc
     namespace: kubelet-serving-cert-approver

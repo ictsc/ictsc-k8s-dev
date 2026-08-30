@@ -42,6 +42,10 @@ locals {
 
   # 踏み台は内部セグメントの末尾。DHCP は .200-.250 から配る
   # (ノードの静的IPは .1-.x / .101-.x なので重ならない)
+  # NFS アプライアンス。ノード (.1-, .101-) とも DHCP レンジ (.200-.250) とも
+  # 踏み台 (.254) とも重ならない位置に置く。
+  nfs_internal_ip = cidrhost(var.internal_network, 150)
+
   bastion_internal_ip = cidrhost(var.internal_network, 254)
   bastion_dhcp_start  = cidrhost(var.internal_network, 200)
   bastion_dhcp_end    = cidrhost(var.internal_network, 250)

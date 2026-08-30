@@ -56,3 +56,8 @@ output "bastion_password" {
   value       = random_password.bastion.result
   sensitive   = true
 }
+
+output "nfs_ip" {
+  description = "NFS アプライアンスの内部 IP (csi-driver-nfs の StorageClass が使う)"
+  value       = sakura_nfs.main.network_interface.ip_address
+}
