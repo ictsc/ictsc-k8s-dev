@@ -214,8 +214,8 @@ tasks:
         NODE=$(terraform output -json talos_input \
           | jq -r '[.nodes[] | select(.role=="controlplane") | .internal_ip][0]')
         cd ..
-        if talosctl --talosconfig talos/talosconfig -n "${NODE}" -e "${EP}" \
-             version --short >/dev/null 2>&1; then
+        if TALOS_EP="${EP}" ./talos/scripts/talosctl-via-bastion.sh \
+             --talosconfig talos/talosconfig -n "${NODE}" version --short >/dev/null 2>&1; then
           echo "==> 生成した設定で control plane に到達できました"
           exit 0
         fi
@@ -309,7 +309,7 @@ tasks:
             | grep -q .; then
             echo "==> ${node} は control plane のためスキップします" >&2
             echo "    etcd のメンバー削除が必要です:" >&2
-            echo "      talosctl -n <残っている cp の IP> etcd remove-member ${node}" >&2
+            echo "      ./talos/scripts/talosctl-via-bastion.sh -n <残っている cp の内部IP> etcd remove-member ${node}" >&2
             echo "      kubectl delete node ${node}" >&2
             continue
           fi
@@ -337,15 +337,15 @@ tasks:
       - |
         CP1=$(cd terraform && terraform output -json control_plane_ips | jq -r '.[0]')
         echo "==> ${CP1} で talosctl bootstrap を実行 (Talos の起動を待つので数分かかります)"
-        until talosctl -n "${CP1}" -e "${CP1}" version --short >/dev/null 2>&1; do sleep 10; done
-        talosctl -n "${CP1}" -e "${CP1}" bootstrap || true
+        until ./talos/scripts/talosctl-via-bastion.sh -n "${CP1}" version --short >/dev/null 2>&1; do sleep 10; done
+        ./talos/scripts/talosctl-via-bastion.sh -n "${CP1}" bootstrap || true
 
         # ここで talosctl health を回してはいけない。
         # health は「全 k8s ノードが Ready」「全 Pod が Running」まで見るが、
         # CNI は task bootstrap-cluster で後入れするため、この時点では絶対に満たされず
         # --wait-timeout ぶん丸ごと待たされる。健全性の確認は task health で CNI 投入後に行う。
         echo "==> etcd が Running になるのを待つ"
-        until talosctl -n "${CP1}" -e "${CP1}" service etcd 2>/dev/null | grep -qE '^STATE +Running'; do sleep 10; done
+        until ./talos/scripts/talosctl-via-bastion.sh -n "${CP1}" service etcd 2>/dev/null | grep -qE '^STATE +Running'; do sleep 10; done
         echo "==> etcd OK"
 
   kubeconfig:
@@ -354,7 +354,7 @@ tasks:
       - mkdir -p .kube
       - |
         CP1=$(cd terraform && terraform output -json control_plane_ips | jq -r '.[0]')
-        talosctl -n "${CP1}" -e "${CP1}" kubeconfig ./.kube/config --force
+        ./talos/scripts/talosctl-via-bastion.sh -n "${CP1}" kubeconfig ./.kube/config --force
       - kubectl config rename-context "$(kubectl config current-context)" "$(cd terraform && terraform workspace show)" || true
 
   hosts:
@@ -537,7 +537,7 @@ tasks:
         WK=$(terraform output -json talos_input \
           | jq -r '[.nodes[] | select(.role == "worker") | .internal_ip] | join(",")')
         cd ..
-        talosctl -n "${CP%%,*}" -e "${EP}" health \
+        TALOS_EP="${EP}" ./talos/scripts/talosctl-via-bastion.sh -n "${CP%%,*}" health \
           --control-plane-nodes "${CP}" \
           --worker-nodes "${WK}" \
           --wait-timeout 10m
@@ -597,7 +597,7 @@ tasks:
 
           echo "==> ${HOST} を更新 (endpoint: ${EP})"
           # --drain は既定 true なので cordon + evict は talosctl がやる
-          talosctl -n "${INTERNAL}" -e "${EP}" upgrade \
+          TALOS_EP="${EP}" ./talos/scripts/talosctl-via-bastion.sh -n "${INTERNAL}" upgrade \
             -i "ghcr.io/siderolabs/installer:${TO}"
 
           echo "==> ${HOST} が Ready になるのを待つ"
@@ -646,10 +646,10 @@ tasks:
         cd ..
 
         echo "==> 計画 (dry-run)"
-        talosctl -n "${CP1}" -e "${EP}" upgrade-k8s --to "${TO}" --dry-run
+        TALOS_EP="${EP}" ./talos/scripts/talosctl-via-bastion.sh -n "${CP1}" upgrade-k8s --to "${TO}" --dry-run
         echo
         echo "==> 実行"
-        talosctl -n "${CP1}" -e "${EP}" upgrade-k8s --to "${TO}"
+        TALOS_EP="${EP}" ./talos/scripts/talosctl-via-bastion.sh -n "${CP1}" upgrade-k8s --to "${TO}"
         echo
         echo "==> 完了。terraform/vars.tf の kubernetes_version と"
         echo "    aqua.yaml の kubectl も ${TO} に揃えておくこと"

@@ -488,6 +488,43 @@ $ cat ~/.kube/cache/oidc-login/* | jq -r .id_token \
 > `1/1 Running` になったのを確認してから次へ進むこと。3台同時にやると
 > etcd の quorum を失う。
 
+## talosctl は踏み台経由で使う
+
+`apid` (50000) と `trustd` (50001) はパケットフィルタで**踏み台からのみ**に絞ってある
+(`terraform/packet-filter.tf`)。手元から直接は届かないので、ラッパー経由で叩く。
+
+```console
+$ ./talos/scripts/talosctl-via-bastion.sh -n 192.168.100.1 version
+$ ./talos/scripts/talosctl-via-bastion.sh -n 192.168.100.1 dmesg
+```
+
+SSH のポート転送で踏み台を経由し、終わったらトンネルを畳む。`-e` は指定しない
+(スクリプトが `127.0.0.1` に差し替える)。`Taskfile.yaml` の talosctl 呼び出しは
+すべてこれを通しているので、`task health` などはそのまま使える。
+
+| 環境変数 | 既定 | 用途 |
+| --- | --- | --- |
+| `TALOS_EP` | control plane の1台目 | 経由する control plane のグローバル IP。`upgrade-talos` は「対象ノード以外」を経由するためにこれを指定している |
+| `BASTION_SSH_USER` | `ubuntu` | 踏み台の SSH ユーザ |
+| `TALOS_TUNNEL_PORT` | `50000` | ローカル側の待ち受けポート |
+
+**`kubectl` はトンネル不要。** 6443 は送信元を絞っていない (認証は TLS + OIDC/証明書
++ RBAC に任せている)。
+
+> [!WARNING]
+> **戻り通信の許可レンジ (32768-61000) は apid/trustd のポートを含んでしまう。**
+> さくらのパケットフィルタはステートレスなので、自分から出した通信の戻りを
+> destination port で許可するしかない。ところが 50000 / 50001 はそのレンジの内側に
+> あるため、素直に書くと「踏み台のみ許可」のつもりが**全世界から apid に届く**。
+> 許可ルールの後、戻り通信の許可より**前**に 50000 / 50001 の明示的な deny を
+> 置くこと (`local.pf_deny_talos_api`)。順序が意味を持つ。
+>
+> 確認は踏み台の外から:
+>
+> ```console
+> $ nc -z -G 6 <control plane のグローバルIP> 50000   # 失敗すれば正しい
+> ```
+
 ## アップグレード
 
 > [!CAUTION]

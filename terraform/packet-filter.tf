@@ -11,6 +11,25 @@
 #       kubelet-preferred-address-types で InternalIP を優先させてある。
 
 locals {
+  # Talos の apid (50000) と trustd (50001) は、下の戻り通信 (32768-61000) の
+  # レンジに *入ってしまう*。許可を先に書いても、送信元が一致しなかった分は
+  # そのまま戻り通信のルールに拾われて素通りする = 実質全世界に開く。
+  # 明示的に閉じてから戻り通信を許可すること。順序が意味を持つ。
+  pf_deny_talos_api = [
+    {
+      protocol         = "tcp"
+      destination_port = "50000"
+      allow            = false
+      description      = "apid は上で許可した送信元以外は破棄 (戻り通信レンジに入るため)"
+    },
+    {
+      protocol         = "tcp"
+      destination_port = "50001"
+      allow            = false
+      description      = "trustd も同様"
+    },
+  ]
+
   # 戻り通信。ステートレスなので必須 (上の WARNING を参照)
   pf_return = [
     {
@@ -134,6 +153,7 @@ resource "sakura_packet_filter_rules" "control_plane" {
     local.pf_talos_api,
     local.pf_trustd,
     local.pf_ingress,
+    local.pf_deny_talos_api,
     local.pf_return,
     local.pf_deny,
   )
@@ -155,6 +175,7 @@ resource "sakura_packet_filter_rules" "worker" {
     local.pf_talos_api,
     local.pf_trustd,
     local.pf_ingress,
+    local.pf_deny_talos_api,
     local.pf_return,
     local.pf_deny,
   )
@@ -183,6 +204,7 @@ resource "sakura_packet_filter_rules" "bastion" {
       },
     ],
     local.pf_icmp,
+    local.pf_deny_talos_api,
     local.pf_return,
     local.pf_deny,
   )
