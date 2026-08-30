@@ -31,8 +31,9 @@ resource "sakura_server" "control_plane" {
   network_interface = [
     {
       # eth0: グローバル (API VIP / Ingress の L2 もここ)
-      upstream        = sakura_internet.k8s_external.vswitch_id
-      user_ip_address = local.control_plane_ips[count.index]
+      upstream         = sakura_internet.k8s_external.vswitch_id
+      user_ip_address  = local.control_plane_ips[count.index]
+      packet_filter_id = sakura_packet_filter.control_plane.id
     },
     {
       # eth1: 内部セグメント (etcd ピア通信)

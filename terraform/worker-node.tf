@@ -28,8 +28,9 @@ resource "sakura_server" "worker_node" {
 
   network_interface = [
     {
-      upstream        = sakura_internet.k8s_external.vswitch_id
-      user_ip_address = local.worker_node_ips[count.index]
+      upstream         = sakura_internet.k8s_external.vswitch_id
+      user_ip_address  = local.worker_node_ips[count.index]
+      packet_filter_id = sakura_packet_filter.worker.id
     },
     {
       upstream        = sakura_vswitch.k8s_internal.id

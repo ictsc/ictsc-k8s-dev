@@ -102,8 +102,9 @@ resource "sakura_server" "bastion" {
   network_interface = [
     {
       # eth0: グローバル。ここから SSH で入る
-      upstream        = sakura_internet.k8s_external.vswitch_id
-      user_ip_address = local.bastion_ip
+      upstream         = sakura_internet.k8s_external.vswitch_id
+      user_ip_address  = local.bastion_ip
+      packet_filter_id = sakura_packet_filter.bastion.id
     },
     {
       # eth1: 内部セグメント。ここに DHCP を配る

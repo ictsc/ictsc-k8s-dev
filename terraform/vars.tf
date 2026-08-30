@@ -68,6 +68,21 @@ variable "internal_network" {
   default     = "192.168.100.0/24"
 }
 
+variable "admin_source_networks" {
+  type        = list(string)
+  description = <<-EOT
+    踏み台を経由せずに kubectl (6443) / talosctl (50000) を叩ける送信元 CIDR。
+    踏み台の IP は常に許可されるのでここに書く必要はない。
+    空のままだと手元から直接 kubectl / talosctl が打てなくなる
+    (踏み台経由の SSH トンネルが必要になる)。
+    単一ホストは "/32" を付けないこと。さくらのパケットフィルタは
+    マスク長 0〜31 しか受け付けず、/32 を渡すと API が 400 を返す
+    (付いていても terraform 側で落とすが、付けない方が意図が明確)。
+    例: ["203.0.113.10"]
+  EOT
+  default     = []
+}
+
 ########################################
 # Talos / Kubernetes
 ########################################

@@ -1,4 +1,8 @@
 .envrc
+
+# 各自の作業環境ごとの値 (admin_source_networks など)。
+# terraform が *.auto.tfvars を自動で読む。
+/terraform/*.auto.tfvars
 .kube
 .terraform
 .terraform.tfstate*
