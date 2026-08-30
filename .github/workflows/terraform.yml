@@ -1,0 +1,100 @@
+name: terraform
+
+# PR では plan まで。apply は手動起動だけにしてある。
+# push で自動 apply にすると、マージした瞬間にノードが作り変わる。
+on:
+  pull_request:
+    paths:
+      - "terraform/**"
+      - "talos/**"
+      - "Taskfile.yaml"
+      - "aqua.yaml"
+      - ".github/workflows/terraform.yml"
+  workflow_dispatch:
+    inputs:
+      workspace:
+        description: "対象の workspace"
+        required: true
+        default: dev
+        type: choice
+        options: [dev, prod]
+      action:
+        description: "plan だけ見るか、apply まで実行するか"
+        required: true
+        default: plan
+        type: choice
+        options: [plan, apply]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+env:
+  SAKURACLOUD_ACCESS_TOKEN: ${{ secrets.SAKURACLOUD_ACCESS_TOKEN }}
+  SAKURACLOUD_ACCESS_TOKEN_SECRET: ${{ secrets.SAKURACLOUD_ACCESS_TOKEN_SECRET }}
+  SAKURACLOUD_ZONE: ${{ vars.SAKURACLOUD_ZONE }}
+  TF_STATE_BUCKET: ${{ vars.TF_STATE_BUCKET }}
+  TF_CLI_ARGS_init: -backend-config=bucket=${{ vars.TF_STATE_BUCKET }}
+  AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+  AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+  # さくらのオブジェクトストレージ側の不具合のワークアラウンド (.envrc.tmpl 参照)
+  AWS_REQUEST_CHECKSUM_CALCULATION: when_required
+  ACME_EMAIL: ${{ vars.ACME_EMAIL }}
+  KUBECONFIG: ${{ github.workspace }}/.kube/config
+  TALOSCONFIG: ${{ github.workspace }}/talos/talosconfig
+
+jobs:
+  terraform:
+    runs-on: ubuntu-latest
+    # apply は environment 経由にして、必要なら承認を挟めるようにする
+    environment: ${{ (inputs.action == 'apply') && 'infrastructure' || '' }}
+    steps:
+      - uses: actions/checkout@v5
+
+      # cidata の ISO を焼くのに使う (talos/scripts/build-iso.sh)
+      - name: ISO 作成コマンドを導入
+        run: sudo apt-get update -qq && sudo apt-get install -y xorriso
+
+      - name: aqua で CLI を導入
+        uses: aquaproj/aqua-installer@v4.0.5
+        with:
+          aqua_version: v2.62.3
+
+      - name: workspace を選択
+        working-directory: terraform
+        run: |
+          terraform init -input=false
+          terraform workspace select -or-create "${{ inputs.workspace || 'dev' }}"
+          terraform workspace show
+
+      - name: fmt / lint
+        working-directory: terraform
+        run: |
+          terraform fmt -check -diff
+          tflint
+
+      # talos/secrets.yaml はクラスタの PKI 本体で git に入っていない。
+      # 無いまま talos-config を走らせると *別クラスタの* 秘密情報を新規生成して
+      # しまうため、Taskfile 側で停止するようにしてある。
+      # apply したい場合は TALOS_SECRETS を必ず設定すること。
+      - name: Talos の secrets を復元
+        if: ${{ inputs.action == 'apply' }}
+        env:
+          TALOS_SECRETS: ${{ secrets.TALOS_SECRETS }}
+        run: |
+          if [ -z "${TALOS_SECRETS}" ]; then
+            echo "::error::secrets.TALOS_SECRETS が未設定です。talos/secrets.yaml が無いと apply できません" >&2
+            exit 1
+          fi
+          umask 077
+          printf '%s' "${TALOS_SECRETS}" | base64 -d > talos/secrets.yaml
+          test -s talos/secrets.yaml
+
+      - name: plan
+        if: ${{ inputs.action != 'apply' }}
+        working-directory: terraform
+        run: terraform plan -input=false -no-color
+
+      - name: apply
+        if: ${{ inputs.action == 'apply' }}
+        run: task apply

@@ -5,10 +5,12 @@ env:
   KUBECONFIG: '{{.ROOT_DIR}}/.kube/config'
 
 vars:
+  # renovate: datasource=github-releases depName=siderolabs/talos
   TALOS_VERSION: v1.13.9
   TF_INPUT_JSON: '{{.ROOT_DIR}}/talos/build/talos-input.json'
   # Gateway API の CRD。ExternalAuth フィルタ (GEP-1494) を使うので
   # standard ではなく experimental チャネルを入れる必要がある。
+  # renovate: datasource=github-releases depName=kubernetes-sigs/gateway-api
   GATEWAY_API_VERSION: v1.6.1
   # Let's Encrypt の失効通知などが飛ぶ宛先。.envrc (direnv) の ACME_EMAIL を読む。
   ACME_EMAIL: '{{.ACME_EMAIL | default "TODO-set-me@ictsc.net"}}'
@@ -406,7 +408,8 @@ tasks:
       - helm repo add argo https://argoproj.github.io/argo-helm
       - helm repo update cilium argo
       - >-
-        helm upgrade --install cilium cilium/cilium --version 1.20.1
+        # renovate: datasource=helm depName=cilium registryUrl=https://helm.cilium.io
+        helm upgrade --install cilium cilium/cilium --version=1.20.1
         --namespace kube-system
         -f manifest/base/cilium/values.yaml
         -f manifest/envs/{{.ENV}}/values/cilium.yaml
@@ -416,7 +419,8 @@ tasks:
       # cert-manager の CRD を必要とし、ExternalAuth 付きの HTTPRoute は
       # oauth2-proxy より後でなければならない。順序は Argo CD の sync-wave に任せる。
       - >-
-        helm upgrade --install argocd argo/argo-cd --version 10.2.3
+        # renovate: datasource=helm depName=argo-cd registryUrl=https://argoproj.github.io/argo-helm
+        helm upgrade --install argocd argo/argo-cd --version=10.2.3
         --namespace argocd --create-namespace
         -f manifest/base/argocd/values.yaml
         -f manifest/envs/{{.ENV}}/values/argocd.yaml

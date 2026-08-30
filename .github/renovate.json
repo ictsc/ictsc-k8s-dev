@@ -1,0 +1,63 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": ["config:recommended"],
+  "timezone": "Asia/Tokyo",
+  "labels": ["dependencies"],
+  "prHourlyLimit": 0,
+  "prConcurrentLimit": 10,
+  "argocd": {
+    "managerFilePatterns": ["/^manifest/envs/[^/]+/[^/]+\\.yaml$/"]
+  },
+  "packageRules": [
+    {
+      "description": "GitHub Actions は自動マージ",
+      "matchManagers": ["github-actions"],
+      "automerge": true
+    },
+    {
+      "description": "digest / pin は自動マージ",
+      "matchUpdateTypes": ["digest", "pin", "pinDigest"],
+      "automerge": true
+    },
+    {
+      "description": "Talos と Kubernetes は台数ぶんノードが再起動するので必ず人間が見る",
+      "matchDepNames": ["siderolabs/talos", "kubernetes/kubernetes"],
+      "automerge": false,
+      "labels": ["dependencies", "requires-cluster-upgrade"],
+      "addLabels": ["requires-cluster-upgrade"]
+    },
+    {
+      "description": "Cilium は CNI なので落ちるとクラスタ全体に影響する",
+      "matchDepNames": ["cilium"],
+      "automerge": false
+    },
+    {
+      "description": "Taskfile と Application の両方に同じチャート版が書いてあるので、まとめて上げる",
+      "matchDepNames": ["cilium"],
+      "groupName": "cilium"
+    },
+    {
+      "matchDepNames": ["argo-cd"],
+      "groupName": "argo-cd"
+    }
+  ],
+  "customManagers": [
+    {
+      "customType": "regex",
+      "description": "# renovate: 注釈が付いた行のバージョン (Taskfile / vars.tf)",
+      "managerFilePatterns": ["/^Taskfile\\.yaml$/", "/^terraform/.+\\.tf$/"],
+      "matchStrings": [
+        "# renovate: datasource=(?<datasource>\\S+) depName=(?<depName>\\S+)(?: registryUrl=(?<registryUrl>\\S+))?(?: versioning=(?<versioning>\\S+))?\\s*\\n\\s*[^\\n]*?[:=]\\s*\"?(?<currentValue>[^\"\\s]+)\"?"
+      ]
+    },
+    {
+      "customType": "regex",
+      "description": "aqua.yaml のパッケージ (owner/repo[/sub]@version)",
+      "managerFilePatterns": ["/^aqua\\.yaml$/"],
+      "matchStrings": [
+        "- name: (?<depName>[^/\\s]+/[^/@\\s]+)(?:/[^@\\s]+)?@(?<currentValue>\\S+)"
+      ],
+      "datasourceTemplate": "github-releases"
+    }
+  ]
+}

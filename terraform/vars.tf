@@ -96,7 +96,8 @@ variable "admin_source_networks" {
 #            task upgrade-talos TO=v1.13.9
 #          その後この値と aqua.yaml の siderolabs/talos も揃えておく。
 variable "talos_version" {
-  type    = string
+  type = string
+  # renovate: datasource=github-releases depName=siderolabs/talos
   default = "v1.13.8"
 }
 
@@ -108,7 +109,8 @@ variable "talos_version" {
 variable "kubernetes_version" {
   type        = string
   description = "新しく作るクラスタの Kubernetes バージョン"
-  default     = "1.36.4"
+  # renovate: datasource=github-releases depName=kubernetes/kubernetes
+  default = "1.36.4"
 }
 
 variable "pod_subnet" {
