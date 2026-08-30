@@ -75,7 +75,7 @@ pkg_install() {
 }
 
 ########################################
-# direnv / zstd
+# direnv / zstd / ISO 作成コマンド
 ########################################
 for t in direnv zstd; do
   if have "${t}"; then
@@ -85,6 +85,15 @@ for t in direnv zstd; do
     pkg_install "${t}"
   fi
 done
+
+# talos/scripts/build-iso.sh が cidata の ISO を焼くのに使う。
+# macOS は hdiutil が標準で入っているので何もしなくてよい。
+if have xorrisofs || have genisoimage || have mkisofs || have hdiutil; then
+  info "ISO 作成コマンドは導入済み"
+else
+  info "xorriso を導入します (cidata の ISO 生成に使う)"
+  pkg_install xorriso
+fi
 
 ########################################
 # aqua

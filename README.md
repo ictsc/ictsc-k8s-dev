@@ -612,6 +612,42 @@ $ talosctl -n <見つけたIP> -e <別のcpのグローバルIP> apply-config -f
 `talosctl` のバージョンは `upgrade` / `upgrade-k8s` の既定値を決めるので、
 先に `aqua.yaml` を上げて `aqua install` しておくとよい。
 
+## 2台目以降のマシンでセットアップする
+
+tfstate は さくらのオブジェクトストレージ (石狩) の S3 backend に置いてあるので、
+**マシン間で共有されている**。`terraform` 関連で持ち回るものは無い。
+
+git に入っていないので手で持ち込む必要があるのは次の2つだけ。
+
+| ファイル | 入手方法 |
+| --- | --- |
+| `.envrc` | `./init.sh` が対話で聞いて作る (API キーなどを手元で入力) |
+| **`talos/secrets.yaml`** | **既存クラスタを構築したマシンからコピーする** |
+
+```console
+$ ./init.sh
+$ scp <構築したマシン>:<リポジトリ>/talos/secrets.yaml talos/secrets.yaml
+$ task select-dev      # workspace は default から始まるので必ず選ぶ
+```
+
+`talosconfig` と `.kube/config` は `secrets.yaml` から再生成されるので、
+コピーしなくてよい (`task talos-config` / `task kubeconfig`)。
+
+> [!CAUTION]
+> **`talos/secrets.yaml` はクラスタの PKI 本体。** これが無い状態で
+> `task talos-config` を走らせると、gen-config.sh は「初回構築だ」と判断して
+> **別のクラスタの秘密情報を新規生成する**。そのまま apply すると CD-ROM が
+> 別 CA で署名された machine config で上書きされ、ノードが再ブートストラップした
+> 瞬間にクラスタへ参加できなくなる。talosctl も一切通らなくなる。
+>
+> 現在は `task talos-config` の冒頭で「tfstate にサーバが在るのに
+> secrets.yaml が無い」場合に停止するようにしてあるが、**そもそも先に
+> コピーしておくこと**。
+
+> [!NOTE]
+> `secrets.yaml` を紛失すると既存クラスタを操作する手段が完全に失われる。
+> 構築したマシン以外にもバックアップを取っておくこと。
+
 ## 秘密情報
 
 - `.envrc.tmpl` — `.envrc` の雛形 (これはコミットする)

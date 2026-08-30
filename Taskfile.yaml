@@ -169,6 +169,30 @@ tasks:
           BINARY: jq
           INSTALL_DOC: "aqua install で導入されます (aqua.yaml を参照)"
     cmds:
+      # 既にクラスタが在るのに talos/secrets.yaml が無い、という状態で走らせない。
+      #
+      # secrets.yaml はクラスタの PKI 本体で gitignore されている。別のマシンに
+      # clone しただけだと存在せず、gen-config.sh は「初回構築だ」と判断して
+      # *別のクラスタの* 秘密情報を新規生成してしまう。そのまま apply すると
+      # CD-ROM が別 CA で署名された machine config で上書きされ、ノードが
+      # 再ブートストラップした瞬間にクラスタへ参加できなくなる。
+      # talosconfig も別 CA になるので talosctl が一切通らなくなる。
+      - |
+        set -eu
+        if [ ! -f talos/secrets.yaml ]; then
+          if (cd terraform && terraform state list 2>/dev/null) | grep -q '^sakura_server\.'; then
+            echo "ERROR: talos/secrets.yaml がありませんが、tfstate には既にサーバが存在します" >&2
+            echo "" >&2
+            echo "  このまま進むと別クラスタの PKI を新規生成してしまいます。" >&2
+            echo "  既存クラスタを構築したマシンから secrets.yaml を持ってきてください:" >&2
+            echo "" >&2
+            echo "    scp <構築したマシン>:<リポジトリ>/talos/secrets.yaml talos/secrets.yaml" >&2
+            echo "" >&2
+            echo "  (本当にゼロから作り直すなら talos/secrets.yaml.new などを作って" >&2
+            echo "   task destroy してから、この判定を通してください)" >&2
+            exit 1
+          fi
+        fi
       - mkdir -p talos/build
       - cd terraform && terraform output -json talos_input > {{.TF_INPUT_JSON}}
       - ./talos/scripts/gen-config.sh {{.TF_INPUT_JSON}}
