@@ -108,8 +108,15 @@ Go があるなら一番手軽:
 $ go install github.com/aquaproj/aqua/v2/cmd/aqua@latest
 ```
 
+> [!IMPORTANT]
+> `go install` は `$(go env GOPATH)/bin` (既定では `~/go/bin`) にバイナリを置く。
+> ここが PATH に無いと、直後に `aqua` を叩いても `command not found` になる。
+> 下記シェル設定の **`GOPATH/bin` の行** を忘れないこと。
+> (もう1行の `AQUA_ROOT_DIR` は aqua が入れる *ツール* の置き場で、別物)
+
 Go を入れたくなければ [GitHub Releases](https://github.com/aquaproj/aqua/releases) から
-バイナリを落として PATH の通った場所に置く。
+バイナリを落として PATH の通った場所 (`~/.local/bin` など) に置く。その場合は
+`GOPATH/bin` の行は要らない。
 
 `direnv` と `zstd` はディストリのパッケージにある。
 
@@ -129,16 +136,25 @@ $ sudo pacman -S --needed direnv zstd
 `aqua` と `direnv` はどちらもシェルの設定が要る。`.zshrc` (bash なら `.bashrc`) に:
 
 ```bash
-# zsh の場合
+# zsh の場合 (.zshrc)
+export PATH="$(go env GOPATH)/bin:$PATH"   # go install で aqua を入れた場合のみ
 export PATH="${AQUA_ROOT_DIR:-${XDG_DATA_HOME:-$HOME/.local/share}/aquaproj-aqua}/bin:$PATH"
 eval "$(direnv hook zsh)"
 ```
 
 ```bash
-# bash の場合
+# bash の場合 (.bashrc)
+export PATH="$(go env GOPATH)/bin:$PATH"   # go install で aqua を入れた場合のみ
 export PATH="${AQUA_ROOT_DIR:-${XDG_DATA_HOME:-$HOME/.local/share}/aquaproj-aqua}/bin:$PATH"
 eval "$(direnv hook bash)"
 ```
+
+2行の PATH は役割が違う。
+
+| PATH | 中身 |
+| --- | --- |
+| `$(go env GOPATH)/bin` | **`aqua` 本体**。`go install` で入れたときだけ必要 |
+| `${AQUA_ROOT_DIR:-...}/bin` | **aqua が入れるツール** (`task` / `terraform` / `kubectl` など) |
 
 > [!NOTE]
 > PATH は `$(aqua root-dir)` と書いてもよいが、それだと `aqua` 自身が先に PATH に
