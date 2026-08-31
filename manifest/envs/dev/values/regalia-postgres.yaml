@@ -1,2 +1,5 @@
 cluster:
   instances: 3
+  storage:
+    storageClass: longhorn-single-replica
+    resizeInUseVolumes: false
