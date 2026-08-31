@@ -3,7 +3,6 @@ resources:
   - ./infra/cert-manager/application.yaml
   - ./infra/kubelet-serving-cert-approver/application.yaml
   - ./infra/csi-driver-nfs/application.yaml
-  - ./infra/secrets-store-csi-driver/application.yaml
   - ./infra/kube-prometheus-stack/application.yaml
   - ./infra/loki/application.yaml
   - ./infra/alloy/application.yaml

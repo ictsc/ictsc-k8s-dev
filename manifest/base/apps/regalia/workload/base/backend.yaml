@@ -76,9 +76,6 @@ spec:
             - name: config
               mountPath: /etc/ictscore
               readOnly: true
-            - name: discord-oauth-client
-              mountPath: /run/secrets/discord-oauth-client
-              readOnly: true
           resources:
             requests:
               cpu: 50m
@@ -96,12 +93,6 @@ spec:
         - name: config
           configMap:
             name: scoreserver-backend-config
-        - name: discord-oauth-client
-          csi:
-            driver: secrets-store.csi.k8s.io
-            readOnly: true
-            volumeAttributes:
-              secretProviderClass: discord-oauth-client
 ---
 apiVersion: v1
 kind: Service

@@ -3,7 +3,7 @@ resources:
   - ./frontend.yaml
   - ./httproute.yaml
   - ./migrate.yaml
-  - ./secret-provider.yaml
+  - ./discord-oauth-dummy.yaml
 
 configMapGenerator:
   - name: scoreserver-backend-config

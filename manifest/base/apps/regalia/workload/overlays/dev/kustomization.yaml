@@ -17,7 +17,6 @@ images:
 patches:
   - path: httproute-patch.yaml
   - path: workload-patch.yaml
-  - path: secret-provider-patch.yaml
   - target:
       group: gateway.networking.k8s.io
       version: v1

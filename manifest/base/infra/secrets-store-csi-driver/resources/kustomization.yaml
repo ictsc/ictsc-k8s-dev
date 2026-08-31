@@ -1,4 +1,0 @@
-resources:
-  - ./provider.yaml
-
-namespace: kube-system

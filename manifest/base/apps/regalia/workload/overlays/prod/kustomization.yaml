@@ -16,7 +16,6 @@ images:
 
 patches:
   - path: httproute-patch.yaml
-  - path: secret-provider-patch.yaml
 
 replicas:
   - name: scoreserver-backend
