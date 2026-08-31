@@ -1,4 +1,6 @@
 alloy:
+  clustering:
+    enabled: true
   configMap:
     content: |-
       // DaemonSet ごとに自ノードの Pod だけを検出し、API 経由でログを読む。
@@ -55,6 +57,26 @@ alloy:
         forward_to = [loki.write.default.receiver]
       }
 
+      loki.source.kubernetes_events "cluster_events" {
+        job_name   = "integrations/kubernetes/eventhandler"
+        log_format = "logfmt"
+        forward_to = [loki.process.cluster_events.receiver]
+
+        clustering {
+          enabled = true
+        }
+      }
+
+      loki.process "cluster_events" {
+        stage.static_labels {
+          values = {
+            cluster  = "ictsc-k8s",
+            log_type = "kubernetes_event",
+          }
+        }
+        forward_to = [loki.write.default.receiver]
+      }
+
       loki.write "default" {
         endpoint {
           url = "http://loki-gateway.monitoring.svc.cluster.local/loki/api/v1/push"
@@ -77,4 +99,3 @@ controller:
 
 serviceMonitor:
   enabled: true
-
