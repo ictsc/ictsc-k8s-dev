@@ -5,6 +5,7 @@ resources:
   - ./resources/gateway.yaml
   - ./resources/cluster-issuer.yaml
   - ./resources/storageclass-nfs.yaml
+  - ./resources/storageclass-longhorn-single-replica.yaml
   - ./resources/alertmanager-discord.yaml
   - ./resources/rbac-oidc.yaml
   - ./resources/httproutes.yaml
