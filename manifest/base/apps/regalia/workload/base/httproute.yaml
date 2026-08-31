@@ -4,7 +4,8 @@ metadata:
   name: scoreserver-contestant
 spec:
   parentRefs:
-    - kind: Gateway
+    - group: gateway.networking.k8s.io
+      kind: Gateway
       name: external
       namespace: gateway
       sectionName: https
@@ -22,15 +23,21 @@ spec:
               type: ReplacePrefixMatch
               replacePrefixMatch: /
       backendRefs:
-        - name: scoreserver-backend
+        - group: ""
+          kind: Service
+          name: scoreserver-backend
           port: 8080
+          weight: 1
     - matches:
         - path:
             type: PathPrefix
             value: /
       backendRefs:
-        - name: scoreserver-frontend
+        - group: ""
+          kind: Service
+          name: scoreserver-frontend
           port: 8080
+          weight: 1
 ---
 apiVersion: gateway.networking.k8s.io/v1
 kind: HTTPRoute
@@ -38,7 +45,8 @@ metadata:
   name: scoreserver-admin
 spec:
   parentRefs:
-    - kind: Gateway
+    - group: gateway.networking.k8s.io
+      kind: Gateway
       name: external
       namespace: gateway
       sectionName: https
@@ -56,12 +64,18 @@ spec:
               type: ReplacePrefixMatch
               replacePrefixMatch: /
       backendRefs:
-        - name: scoreserver-backend
+        - group: ""
+          kind: Service
+          name: scoreserver-backend
           port: 8081
+          weight: 1
     - matches:
         - path:
             type: PathPrefix
             value: /
       backendRefs:
-        - name: scoreserver-frontend
+        - group: ""
+          kind: Service
+          name: scoreserver-frontend
           port: 8081
+          weight: 1

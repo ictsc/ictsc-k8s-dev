@@ -6,9 +6,12 @@
           type: PathPrefix
           value: /oauth2
     backendRefs:
-      - name: oauth2-proxy
+      - group: ""
+        kind: Service
+        name: oauth2-proxy
         namespace: oauth2-proxy
         port: 80
+        weight: 1
 - op: add
   path: /spec/rules/1/filters/0
   value:
@@ -16,6 +19,7 @@
     externalAuth:
       protocol: HTTP
       backendRef:
+        group: ""
         kind: Service
         name: oauth2-proxy
         namespace: oauth2-proxy

@@ -76,6 +76,12 @@ spec:
             - name: config
               mountPath: /etc/ictscore
               readOnly: true
+          readinessProbe:
+            grpc:
+              port: 8081
+          livenessProbe:
+            grpc:
+              port: 8081
           resources:
             requests:
               cpu: 50m
