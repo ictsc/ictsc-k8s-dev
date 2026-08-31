@@ -27,9 +27,79 @@ cluster_id=1
 [ "${env}" = "prod" ] && cluster_id=2
 
 regalia_oauth2_redirect_uris=""
+longhorn_oauth2_redirect_uri=""
+longhorn_certificate_dns_name=""
+longhorn_httproute=""
 if [ "${env}" = "dev" ]; then
   regalia_oauth2_redirect_uris="        - https://contest.${domain}/oauth2/callback
         - https://admin-contest.${domain}/oauth2/callback"
+  longhorn_oauth2_redirect_uri="        - https://longhorn.${domain}/oauth2/callback"
+  longhorn_certificate_dns_name="    - longhorn.${domain}"
+  longhorn_httproute="---
+# Longhorn UI は認証機能を持たないため ExternalAuth で保護する。
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: longhorn
+  namespace: longhorn-system
+  annotations:
+    argocd.argoproj.io/sync-wave: \"10\"
+spec:
+  parentRefs:
+    - name: external
+      namespace: gateway
+      sectionName: https
+  hostnames:
+    - longhorn.${domain}
+  rules:
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /oauth2
+      backendRefs:
+        - name: oauth2-proxy
+          namespace: oauth2-proxy
+          port: 80
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /
+      filters:
+        - type: ExternalAuth
+          externalAuth:
+            protocol: HTTP
+            backendRef:
+              kind: Service
+              name: oauth2-proxy
+              namespace: oauth2-proxy
+              port: 80
+            http:
+              allowedHeaders:
+                - Cookie
+                - X-Forwarded-Proto
+                - X-Forwarded-Host
+              allowedResponseHeaders:
+                - Set-Cookie
+                - X-Auth-Request-User
+                - X-Auth-Request-Email
+      backendRefs:
+        - name: longhorn-frontend
+          port: 80
+---
+apiVersion: gateway.networking.k8s.io/v1beta1
+kind: ReferenceGrant
+metadata:
+  name: longhorn-to-oauth2-proxy
+  namespace: oauth2-proxy
+spec:
+  from:
+    - group: gateway.networking.k8s.io
+      kind: HTTPRoute
+      namespace: longhorn-system
+  to:
+    - group: \"\"
+      kind: Service
+      name: oauth2-proxy"
 fi
 
 # Helm values
@@ -136,6 +206,7 @@ config:
       redirectURIs:
         - https://httpbin.${domain}/oauth2/callback
 ${regalia_oauth2_redirect_uris}
+${longhorn_oauth2_redirect_uri}
     - id: argocd
       name: Argo CD
       secretEnv: ARGOCD_CLIENT_SECRET
@@ -233,6 +304,7 @@ spec:
     - dex.${domain}
     - httpbin.${domain}
     - grafana.${domain}
+${longhorn_certificate_dns_name}
     - contest.${domain}
     - admin-contest.${domain}
 EOF
@@ -441,6 +513,7 @@ spec:
     - group: ""
       kind: Service
       name: oauth2-proxy
+${longhorn_httproute}
 EOF
 
 echo "==> ${d} を更新しました。git に commit / push してから Argo CD に同期させてください"

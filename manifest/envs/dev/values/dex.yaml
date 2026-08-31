@@ -29,6 +29,7 @@ config:
         - https://httpbin.k8s-dev.ictsc.net/oauth2/callback
         - https://contest.k8s-dev.ictsc.net/oauth2/callback
         - https://admin-contest.k8s-dev.ictsc.net/oauth2/callback
+        - https://longhorn.k8s-dev.ictsc.net/oauth2/callback
     - id: argocd
       name: Argo CD
       secretEnv: ARGOCD_CLIENT_SECRET
