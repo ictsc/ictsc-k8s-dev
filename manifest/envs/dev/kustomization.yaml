@@ -29,6 +29,9 @@ patches:
       - op: add
         path: /spec/sources/0/helm/valueFiles/-
         value: $values/manifest/envs/dev/values/kube-prometheus-stack.yaml
+      - op: add
+        path: /spec/sources/0/helm/valueFiles/-
+        value: $values/manifest/envs/dev/values/kube-prometheus-stack-storage.yaml
   - target: {kind: Application, name: loki}
     patch: |-
       - op: add
@@ -54,3 +57,8 @@ patches:
       - op: add
         path: /spec/sources/0/helm/valueFiles/-
         value: $values/manifest/envs/dev/values/regalia-postgres.yaml
+  - target: {kind: Application, name: regalia-valkey}
+    patch: |-
+      - op: add
+        path: /spec/sources/0/helm/valueFiles/-
+        value: $values/manifest/envs/dev/values/regalia-valkey.yaml
