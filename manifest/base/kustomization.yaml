@@ -11,3 +11,4 @@ resources:
   - ./dex/application.yaml
   - ./oauth2-proxy/application.yaml
   - ./httpbin/application.yaml
+  - ./regalia/application.yaml

@@ -35,3 +35,11 @@ patches:
       - op: add
         path: /spec/sources/0/helm/valueFiles/-
         value: $values/manifest/envs/prod/values/oauth2-proxy.yaml
+  - target: {kind: Application, name: regalia}
+    patch: |-
+      - op: replace
+        path: /spec/source/targetRevision
+        value: "*"
+      - op: replace
+        path: /spec/source/path
+        value: infra/overlays/prod

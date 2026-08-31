@@ -309,6 +309,17 @@ Application YAML は手で編集する。`task render-env-values` が更新す�
 ある `values/` と `resources/` だけ。未構築の環境では生成ファイルがまだ存在しないため、
 その環境の root Application は `task up` で生成を済ませてから適用する。
 
+Regaliaは`ictsc-regalia`の`infra/overlays/<env>`を直接参照する。devは`main`の先頭、
+prodはstable semver tagの最新を追従するため、デプロイ先のcommitをここで書き換える必要はない。
+
+```console
+$ git -C ../ictsc-regalia tag v1.2.3
+$ git -C ../ictsc-regalia push origin v1.2.3
+```
+
+このtag pushでprod用imageも発行される。private repo用deploy keyは`task start-gitops`が
+このリポジトリ分とRegalia分をまとめて登録する。
+
 > [!WARNING]
 > **`terraform apply` がサーバ作成中にタイムアウトや 409 で落ちたら、孤児サーバを疑うこと。**
 > ゾーンが混んでいるとサーバ作成に数十分かかることがあり、さくら側では作成が完了して

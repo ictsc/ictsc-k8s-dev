@@ -490,6 +490,15 @@ tasks:
         gh repo deploy-key add "${tmp}/key.pub" --repo "{{.REPO}}" --title "${title}"
         echo "==> deploy key を {{.REPO}} に登録しました (read-only)"
 
+  argocd-repo-keys:
+    desc: Argo CD が参照する private GitHub リポジトリを登録
+    internal: true
+    cmds:
+      - task: argocd-repo-key
+      - task: argocd-repo-key
+        vars:
+          REPO: ictsc/ictsc-regalia
+
   auth-secrets:
     desc: Dex / oauth2-proxy / Argo CD の OIDC 用 Secret を作る
     status:
@@ -542,7 +551,7 @@ tasks:
   start-gitops:
     desc: app-of-apps のルートを適用して Argo CD に引き継ぐ
     deps:
-      - task: argocd-repo-key
+      - task: argocd-repo-keys
       - task: auth-secrets
     vars:
       ENV: { sh: 'cd terraform && terraform workspace show' }
