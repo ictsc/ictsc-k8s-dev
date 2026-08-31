@@ -24,9 +24,17 @@ loki:
   compactor:
     retention_enabled: true
     delete_request_store: filesystem
+  rulerConfig:
+    enable_api: true
+    alertmanager_url: http://kube-prometheus-stack-alertmanager.monitoring.svc.cluster.local:9093
+    storage:
+      type: local
+      local:
+        directory: /etc/loki/rules
 
 singleBinary:
   replicas: 1
+  sidecar: false
   persistence:
     enabled: true
     storageClass: nfs
@@ -40,6 +48,14 @@ singleBinary:
       memory: 256Mi
     limits:
       memory: 1Gi
+  extraVolumes:
+    - name: alert-rules
+      configMap:
+        name: loki-alert-rules
+  extraVolumeMounts:
+    - name: alert-rules
+      mountPath: /etc/loki/rules/fake
+      readOnly: true
 
 # Monolithic 以外の構成要素は明示的に停止する。
 backend:
@@ -77,3 +93,32 @@ monitoring:
     enabled: true
   alerts:
     enabled: true
+
+extraObjects:
+  - apiVersion: v1
+    kind: ConfigMap
+    metadata:
+      name: loki-alert-rules
+    data:
+      kubernetes-events.yaml: |
+        groups:
+          - name: kubernetes-events
+            interval: 1m
+            rules:
+              - alert: KubernetesWarningEvent
+                expr: |
+                  sum by (namespace, reason, kind, name) (
+                    count_over_time(
+                      {log_type="kubernetes_event"}
+                        | logfmt
+                        | type="Warning"
+                      [5m]
+                    )
+                  ) > 0
+                for: 1m
+                labels:
+                  severity: warning
+                  category: kubernetes-event
+                annotations:
+                  summary: Kubernetes Warning Eventを検出しました
+                  description: 直近5分にWarning Eventが発生しています。namespace、reason、kind、nameラベルを確認してください。
