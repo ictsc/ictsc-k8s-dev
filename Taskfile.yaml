@@ -407,6 +407,52 @@ tasks:
           --dry-run=client -o yaml | kubectl apply -f - >/dev/null
         echo "==> monitoring/alertmanager-discord を作成しました"
 
+  object-storage-secrets:
+    desc: Terraform が発行した Loki / Tempo 用 Object Storage 認証情報を Secret にする
+    deps:
+      - task: check-binary
+        vars:
+          BINARY: jq
+          INSTALL_DOC: "aqua install で導入されます (aqua.yaml を参照)"
+      - task: check-binary
+        vars:
+          BINARY: kubectl
+          INSTALL_DOC: https://kubernetes.io/docs/tasks/tools/
+    cmds:
+      - |
+        set -eu
+
+        env=$(cd terraform && terraform workspace show)
+        if [ "${env}" != "dev" ]; then
+          echo "Object Storage 認証情報は dev workspace だけに作成されています (現在: ${env})" >&2
+          echo "task select-dev を実行してからやり直してください" >&2
+          exit 1
+        fi
+
+        tmp=$(mktemp -d)
+        trap 'rm -rf "${tmp}"' EXIT
+        chmod 700 "${tmp}"
+
+        terraform -chdir=terraform output -json loki_object_storage_credentials \
+          | jq -er '"AWS_ACCESS_KEY_ID=\(.access_key)\nAWS_SECRET_ACCESS_KEY=\(.secret_key)"' \
+          > "${tmp}/loki.env"
+        terraform -chdir=terraform output -json tempo_object_storage_credentials \
+          | jq -er '"AWS_ACCESS_KEY_ID=\(.access_key)\nAWS_SECRET_ACCESS_KEY=\(.secret_key)"' \
+          > "${tmp}/tempo.env"
+        chmod 600 "${tmp}/loki.env" "${tmp}/tempo.env"
+
+        kubectl create namespace monitoring \
+          --dry-run=client -o yaml | kubectl apply -f - >/dev/null
+        kubectl -n monitoring create secret generic loki-object-storage \
+          --from-env-file="${tmp}/loki.env" \
+          --dry-run=client -o yaml | kubectl apply -f - >/dev/null
+        kubectl -n monitoring create secret generic tempo-object-storage \
+          --from-env-file="${tmp}/tempo.env" \
+          --dry-run=client -o yaml | kubectl apply -f - >/dev/null
+
+        echo "==> monitoring/loki-object-storage を作成しました"
+        echo "==> monitoring/tempo-object-storage を作成しました"
+
   argocd-repo-key:
     desc: Argo CD が private リポジトリを読むための deploy key を作って GitHub に登録
     deps:

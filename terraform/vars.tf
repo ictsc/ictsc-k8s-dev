@@ -73,6 +73,20 @@ variable "service_subnet" {
   default = "10.96.0.0/12"
 }
 
+# Object Storage (Observability)
+
+variable "object_storage_site_id" {
+  type        = string
+  description = "監視データを保存するさくらの Object Storage サイト ID"
+  default     = "isk01"
+}
+
+variable "object_storage_bucket_prefix" {
+  type        = string
+  description = "Loki / Tempo 用 Object Storage バケット名の接頭辞"
+  default     = "ictsc-void-k8s"
+}
+
 # Control Plane
 
 variable "control_plane" {

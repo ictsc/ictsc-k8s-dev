@@ -17,6 +17,7 @@ spec:
         releaseName: loki
         valueFiles:
           - $values/manifest/base/loki/values.yaml
+          - $values/manifest/envs/dev/values/loki.yaml
     - repoURL: git@github.com:ictsc/ictsc-k8s-dev.git
       targetRevision: main
       ref: values
@@ -30,4 +31,3 @@ spec:
     automated:
       prune: true
       selfHeal: true
-
