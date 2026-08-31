@@ -1,33 +1,31 @@
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
-  name: alloy
+  name: cilium
   namespace: argocd
   annotations:
-    argocd.argoproj.io/sync-wave: "-6"
+    argocd.argoproj.io/sync-wave: "-30"
   finalizers:
     - resources-finalizer.argocd.argoproj.io
 spec:
   project: default
   sources:
-    - repoURL: https://grafana.github.io/helm-charts
-      chart: alloy
-      targetRevision: 1.11.0
+    - repoURL: https://helm.cilium.io/
+      chart: cilium
+      targetRevision: 1.20.1
       helm:
-        releaseName: alloy
+        releaseName: cilium
         valueFiles:
-          - $values/manifest/base/alloy/values.yaml
+          - $values/manifest/base/cilium/values.yaml
     - repoURL: git@github.com:ictsc/ictsc-k8s-dev.git
       targetRevision: main
       ref: values
   destination:
     server: https://kubernetes.default.svc
-    namespace: monitoring
+    namespace: kube-system
   syncPolicy:
     syncOptions:
       - ServerSideApply=true
-      - CreateNamespace=true
     automated:
       prune: true
       selfHeal: true
-

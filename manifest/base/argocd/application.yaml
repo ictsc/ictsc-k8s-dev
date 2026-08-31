@@ -1,33 +1,33 @@
+# Argo CD 自身も Argo CD で管理する (self-managed)
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
-  name: cert-manager
+  name: argocd
   namespace: argocd
   annotations:
-    # Certificate / ClusterIssuer より先に CRD とコントローラを立てる
-    argocd.argoproj.io/sync-wave: "-20"
+    argocd.argoproj.io/sync-wave: "10"
   finalizers:
     - resources-finalizer.argocd.argoproj.io
 spec:
   project: default
   sources:
-    - repoURL: https://charts.jetstack.io
-      chart: cert-manager
-      targetRevision: v1.21.1
+    - repoURL: https://argoproj.github.io/argo-helm
+      chart: argo-cd
+      targetRevision: 10.2.3
       helm:
-        releaseName: cert-manager
+        releaseName: argocd
         valueFiles:
-          - $values/manifest/base/cert-manager/values.yaml
+          - $values/manifest/base/argocd/values.yaml
     - repoURL: git@github.com:ictsc/ictsc-k8s-dev.git
       targetRevision: main
       ref: values
   destination:
     server: https://kubernetes.default.svc
-    namespace: cert-manager
+    namespace: argocd
   syncPolicy:
     syncOptions:
-      - ServerSideApply=true
       - CreateNamespace=true
+      - ServerSideApply=true
     automated:
-      prune: true
+      prune: false # 自分自身を消してしまわないように prune は切っておく
       selfHeal: true

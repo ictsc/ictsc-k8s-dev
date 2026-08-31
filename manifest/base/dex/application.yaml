@@ -1,32 +1,33 @@
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
-  name: cilium
+  name: dex
   namespace: argocd
   annotations:
-    argocd.argoproj.io/sync-wave: "-30"
+    # oauth2-proxy が起動時に issuer の discovery を叩くので先に立てる
+    argocd.argoproj.io/sync-wave: "-5"
   finalizers:
     - resources-finalizer.argocd.argoproj.io
 spec:
   project: default
   sources:
-    - repoURL: https://helm.cilium.io/
-      chart: cilium
-      targetRevision: 1.20.1
+    - repoURL: https://charts.dexidp.io
+      chart: dex
+      targetRevision: 0.24.1
       helm:
-        releaseName: cilium
+        releaseName: dex
         valueFiles:
-          - $values/manifest/base/cilium/values.yaml
-          - $values/manifest/envs/prod/values/cilium.yaml
+          - $values/manifest/base/dex/values.yaml
     - repoURL: git@github.com:ictsc/ictsc-k8s-dev.git
       targetRevision: main
       ref: values
   destination:
     server: https://kubernetes.default.svc
-    namespace: kube-system
+    namespace: dex
   syncPolicy:
     syncOptions:
       - ServerSideApply=true
+      - CreateNamespace=true
     automated:
       prune: true
       selfHeal: true

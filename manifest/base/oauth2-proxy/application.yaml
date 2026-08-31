@@ -1,32 +1,32 @@
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
-  name: cilium
+  name: oauth2-proxy
   namespace: argocd
   annotations:
-    argocd.argoproj.io/sync-wave: "-30"
+    argocd.argoproj.io/sync-wave: "-3"
   finalizers:
     - resources-finalizer.argocd.argoproj.io
 spec:
   project: default
   sources:
-    - repoURL: https://helm.cilium.io/
-      chart: cilium
-      targetRevision: 1.20.1
+    - repoURL: https://oauth2-proxy.github.io/manifests
+      chart: oauth2-proxy
+      targetRevision: 10.7.0
       helm:
-        releaseName: cilium
+        releaseName: oauth2-proxy
         valueFiles:
-          - $values/manifest/base/cilium/values.yaml
-          - $values/manifest/envs/dev/values/cilium.yaml
+          - $values/manifest/base/oauth2-proxy/values.yaml
     - repoURL: git@github.com:ictsc/ictsc-k8s-dev.git
       targetRevision: main
       ref: values
   destination:
     server: https://kubernetes.default.svc
-    namespace: kube-system
+    namespace: oauth2-proxy
   syncPolicy:
     syncOptions:
       - ServerSideApply=true
+      - CreateNamespace=true
     automated:
       prune: true
       selfHeal: true

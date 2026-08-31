@@ -1,0 +1,13 @@
+resources:
+  - ./cilium/application.yaml
+  - ./cert-manager/application.yaml
+  - ./kubelet-serving-cert-approver/application.yaml
+  - ./csi-driver-nfs/application.yaml
+  - ./kube-prometheus-stack/application.yaml
+  - ./loki/application.yaml
+  - ./alloy/application.yaml
+  - ./metrics-server/application.yaml
+  - ./argocd/application.yaml
+  - ./dex/application.yaml
+  - ./oauth2-proxy/application.yaml
+  - ./httpbin/application.yaml

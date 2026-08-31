@@ -6,7 +6,7 @@
   "prHourlyLimit": 0,
   "prConcurrentLimit": 10,
   "argocd": {
-    "managerFilePatterns": ["/^manifest/envs/[^/]+/[^/]+\\.yaml$/"]
+    "managerFilePatterns": ["/^manifest/base/[^/]+/application\\.yaml$/"]
   },
   "packageRules": [
     {

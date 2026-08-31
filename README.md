@@ -12,8 +12,8 @@ ictsc-k8s-dev/
 ├── terraform/  (さくらのクラウドのリソース定義。provider は sacloud/sakura)
 ├── talos/      (Talos の machine config パッチと生成スクリプト)
 ├── manifest/   (Kubernetes マニフェスト。Argo CD の app-of-apps)
-│   ├── base/     (env 共通の Helm values と workload)
-│   ├── envs/     (env ごとの Application・values・クラスタリソース)
+│   ├── base/     (Application と共通の Helm values / workload)
+│   ├── envs/     (env ごとの values・patch・クラスタリソース)
 │   └── scripts/  (env 固有の values / resources を terraform output から生成する)
 │
 ├── aqua.yaml     (CLI のバージョン固定)
@@ -271,9 +271,17 @@ GitHub App (または OAuth App) は `./init.sh` より先に用意しておく�
 
 ### Argo CD Application の追加
 
-dev と prod は別クラスタなので、`manifest/envs/dev` と
-`manifest/envs/prod` に Application を明示的に置く。差分を追うためだけの
-base / patch は作らず、共通化よりも「その環境で何が動くか」の読みやすさを優先する。
+共通の Application と Helm values はアプリ単位で同じディレクトリに置く。
+
+```plain
+manifest/base/alloy/
+├── application.yaml
+└── values.yaml
+```
+
+dev / prod の `kustomization.yaml` は `manifest/base` を読み、環境固有valuesが必要な
+Applicationだけ`patches` で参照を追加する。Alloyのように差分がないものはpatch不要。
+root Applicationは参照先が異なるため、`manifest/root-dev.yaml` と `root-prod.yaml` に分ける。
 
 外部 Git リポジトリのマニフェストは、Application の `spec.source` で指定する。
 
@@ -284,15 +292,14 @@ source:
   path: deploy/overlays/dev
 ```
 
-追加した Application は同じディレクトリの `kustomization.yaml` に登録する。
+追加した Application は `manifest/base/kustomization.yaml` に登録する。
 private GitHub リポジトリなら、Argo CD へ read-only deploy key も登録する。
 
 ```console
 $ task argocd-repo-key REPO=owner/repository
 ```
 
-`targetRevision` は dev では `main`、prod では release tag または commit SHA への固定を基本とする。
-このリポジトリ内のマニフェストを指す場合だけ `manifest/base` を使う。
+dev / prod で `targetRevision` を分ける場合も、各envの`patches`で上書きする。
 
 Application YAML は手で編集する。`task render-env-values` が更新するのは、先頭に生成コメントが
 ある `values/` と `resources/` だけ。未構築の環境では生成ファイルがまだ存在しないため、
@@ -590,7 +597,7 @@ SSH のポート転送で踏み台を経由し、終わったらトンネルを�
 | --- | --- |
 | Talos OS | `task upgrade-talos TO=v1.13.9` |
 | Kubernetes | `task upgrade-k8s TO=1.36.4` |
-| Cilium / cert-manager などの Helm チャート | `manifest/envs/<env>/*.yaml` の `targetRevision` を上げて push (Argo CD が反映) |
+| Cilium / cert-manager などの Helm チャート | `manifest/base/<app>/application.yaml` の `targetRevision` を上げて push (Argo CD が反映) |
 
 ### Talos OS
 

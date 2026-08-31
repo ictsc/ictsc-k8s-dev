@@ -12,7 +12,7 @@ spec:
   source:
     repoURL: git@github.com:ictsc/ictsc-k8s-dev.git
     targetRevision: main
-    path: manifest/base/httpbin
+    path: manifest/base/httpbin/workload
   destination:
     server: https://kubernetes.default.svc
     namespace: httpbin

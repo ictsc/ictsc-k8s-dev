@@ -1,16 +1,5 @@
 resources:
-  - ./cilium.yaml
-  - ./cert-manager.yaml
-  - ./kubelet-serving-cert-approver.yaml
-  - ./csi-driver-nfs.yaml
-  - ./kube-prometheus-stack.yaml
-  - ./loki.yaml
-  - ./alloy.yaml
-  - ./metrics-server.yaml
-  - ./argocd.yaml
-  - ./dex.yaml
-  - ./oauth2-proxy.yaml
-  - ./httpbin.yaml
+  - ../../base
   - ./resources/cilium-lb-ip-pool.yaml
   - ./resources/cilium-l2-announcement.yaml
   - ./resources/gateway.yaml
@@ -19,3 +8,30 @@ resources:
   - ./resources/alertmanager-discord.yaml
   - ./resources/rbac-oidc.yaml
   - ./resources/httproutes.yaml
+
+patches:
+  - target: {kind: Application, name: cilium}
+    patch: |-
+      - op: add
+        path: /spec/sources/0/helm/valueFiles/-
+        value: $values/manifest/envs/prod/values/cilium.yaml
+  - target: {kind: Application, name: kube-prometheus-stack}
+    patch: |-
+      - op: add
+        path: /spec/sources/0/helm/valueFiles/-
+        value: $values/manifest/envs/prod/values/kube-prometheus-stack.yaml
+  - target: {kind: Application, name: argocd}
+    patch: |-
+      - op: add
+        path: /spec/sources/0/helm/valueFiles/-
+        value: $values/manifest/envs/prod/values/argocd.yaml
+  - target: {kind: Application, name: dex}
+    patch: |-
+      - op: add
+        path: /spec/sources/0/helm/valueFiles/-
+        value: $values/manifest/envs/prod/values/dex.yaml
+  - target: {kind: Application, name: oauth2-proxy}
+    patch: |-
+      - op: add
+        path: /spec/sources/0/helm/valueFiles/-
+        value: $values/manifest/envs/prod/values/oauth2-proxy.yaml
