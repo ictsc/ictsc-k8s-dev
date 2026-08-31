@@ -20,6 +20,12 @@ spec:
     groupWait: 30s
     groupInterval: 5m
     repeatInterval: 12h
+    routes:
+      - receiver: discord-no-resolved
+        matchers:
+          - name: category
+            value: kubernetes-event
+            matchType: =
   receivers:
     - name: discord
       discordConfigs:
@@ -27,3 +33,9 @@ spec:
             name: alertmanager-discord
             key: webhook-url
           sendResolved: true
+    - name: discord-no-resolved
+      discordConfigs:
+        - apiURL:
+            name: alertmanager-discord
+            key: webhook-url
+          sendResolved: false
