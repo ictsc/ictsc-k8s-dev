@@ -315,10 +315,12 @@ provisioner: nfs.csi.k8s.io
 parameters:
   server: ${nfs_ip}
   share: /export
-  # PV ごとに <namespace>-<pvc名>-<pv名> のディレクトリを掘る
-  subDir: \${.PVC.namespace}-\${.PVC.name}-\${.PV.name}
+  # subDir は指定しない。指定しないとドライバが PV 名でディレクトリを掘るので
+  # PV ごとに分かれる。テンプレート変数のつもりで固定文字列を渡すと、
+  # 全 PV が同じディレクトリを共有して最初に書いた Pod の所有物になる。
+  #
   # NFS では fsGroup が効かない (ブロックデバイスではないため kubelet が
-  # chown してくれない)。既定だと root 所有で作られ、非 root で動くコンテナ
+  # chown してくれない)。既定の 0755 + root 所有だと、非 root で動くコンテナ
   # (Prometheus は UID 65534) が書けずに permission denied で落ちる。
   mountPermissions: "0777"
 reclaimPolicy: Delete
