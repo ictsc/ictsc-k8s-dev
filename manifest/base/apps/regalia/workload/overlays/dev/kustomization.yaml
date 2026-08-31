@@ -1,0 +1,20 @@
+resources:
+  - ../../base
+
+namespace: scoreserver
+
+images:
+  - name: backend
+    newName: ghcr.io/ictsc/ictsc-regalia/backend
+    newTag: sha-44aa601
+  - name: frontend
+    newName: ghcr.io/ictsc/ictsc-regalia/frontend
+    newTag: sha-44aa601
+
+patches:
+  - path: httproute-patch.yaml
+  - target:
+      group: gateway.networking.k8s.io
+      version: v1
+      kind: HTTPRoute
+    path: external-auth-patch.yaml

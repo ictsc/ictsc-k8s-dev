@@ -38,8 +38,5 @@ patches:
   - target: {kind: Application, name: regalia}
     patch: |-
       - op: replace
-        path: /spec/source/targetRevision
-        value: "*"
-      - op: replace
         path: /spec/source/path
-        value: infra/overlays/prod
+        value: manifest/base/apps/regalia/workload/overlays/prod

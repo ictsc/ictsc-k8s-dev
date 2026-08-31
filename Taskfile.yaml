@@ -378,7 +378,7 @@ tasks:
         # renovate: datasource=helm depName=cilium registryUrl=https://helm.cilium.io
         helm upgrade --install cilium cilium/cilium --version=1.20.1
         --namespace kube-system
-        -f manifest/base/cilium/values.yaml
+        -f manifest/base/infra/cilium/values.yaml
         -f manifest/envs/{{.ENV}}/values/cilium.yaml
         --wait --timeout 10m
       - kubectl -n kube-system rollout status deploy/coredns --timeout=10m
@@ -387,7 +387,7 @@ tasks:
         # renovate: datasource=helm depName=argo-cd registryUrl=https://argoproj.github.io/argo-helm
         helm upgrade --install argocd argo/argo-cd --version=10.2.3
         --namespace argocd --create-namespace
-        -f manifest/base/argocd/values.yaml
+        -f manifest/base/infra/argocd/values.yaml
         -f manifest/envs/{{.ENV}}/values/argocd.yaml
         --wait --timeout 10m
 
@@ -495,9 +495,6 @@ tasks:
     internal: true
     cmds:
       - task: argocd-repo-key
-      - task: argocd-repo-key
-        vars:
-          REPO: ictsc/ictsc-regalia
 
   auth-secrets:
     desc: Dex / oauth2-proxy / Argo CD の OIDC 用 Secret を作る

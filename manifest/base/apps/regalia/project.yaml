@@ -1,0 +1,13 @@
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: regalia
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "-1"
+spec:
+  sourceRepos:
+    - git@github.com:ictsc/ictsc-k8s-dev.git
+  destinations:
+    - server: https://kubernetes.default.svc
+      namespace: scoreserver

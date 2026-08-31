@@ -12,7 +12,7 @@ ictsc-k8s-dev/
 ├── terraform/  (さくらのクラウドのリソース定義。provider は sacloud/sakura)
 ├── talos/      (Talos の machine config パッチと生成スクリプト)
 ├── manifest/   (Kubernetes マニフェスト。Argo CD の app-of-apps)
-│   ├── base/     (Application と共通の Helm values / workload)
+│   ├── base/     (apps / infra の Application・values・workload)
 │   ├── envs/     (env ごとの values・patch・クラスタリソース)
 │   └── scripts/  (env 固有の values / resources を terraform output から生成する)
 │
@@ -271,12 +271,18 @@ GitHub App (または OAuth App) は `./init.sh` より先に用意しておく�
 
 ### Argo CD Application の追加
 
-共通の Application と Helm values はアプリ単位で同じディレクトリに置く。
+`manifest/base`は利用者向けworkloadとクラスタ機能に分ける。ApplicationとHelm valuesは
+コンポーネント単位で同じディレクトリに置く。
 
 ```plain
-manifest/base/alloy/
-├── application.yaml
-└── values.yaml
+manifest/base/
+├── apps/
+│   ├── httpbin/
+│   └── regalia/
+└── infra/
+    └── alloy/
+        ├── application.yaml
+        └── values.yaml
 ```
 
 Helm chart外の追加リソースは同じアプリ配下の`resources/`に置く。
@@ -309,16 +315,18 @@ Application YAML は手で編集する。`task render-env-values` が更新す�
 ある `values/` と `resources/` だけ。未構築の環境では生成ファイルがまだ存在しないため、
 その環境の root Application は `task up` で生成を済ませてから適用する。
 
-Regaliaは`ictsc-regalia`の`infra/overlays/<env>`を直接参照する。devは`main`の先頭、
-prodはstable semver tagの最新を追従するため、デプロイ先のcommitをここで書き換える必要はない。
+RegaliaのKubernetesリソースとデプロイ中のimage versionは
+`manifest/base/apps/regalia`で管理する。`ictsc-regalia`のActionsはimageを発行した後、
+対応するoverlayのbackend/frontendを同じcommitで更新する。
 
-```console
-$ git -C ../ictsc-regalia tag v1.2.3
-$ git -C ../ictsc-regalia push origin v1.2.3
+```text
+main push  -> dev へ sha-<commit>
+v1.2.3 tag -> prod へ v1.2.3
 ```
 
-このtag pushでprod用imageも発行される。private repo用deploy keyは`task start-gitops`が
-このリポジトリ分とRegalia分をまとめて登録する。
+Actionsからこのリポジトリへ書き込むGitHub AppにはContentsのwrite権限を与え、
+Regalia側に`K8S_CONFIG_APP_CLIENT_ID` variableと`K8S_CONFIG_APP_PRIVATE_KEY` secretを設定する。
+そのAppを`ictsc-k8s-dev`にinstallし、mainのbranch rulesで必要な場合はpushを許可する。
 
 > [!WARNING]
 > **`terraform apply` がサーバ作成中にタイムアウトや 409 で落ちたら、孤児サーバを疑うこと。**
@@ -612,7 +620,7 @@ SSH のポート転送で踏み台を経由し、終わったらトンネルを�
 | --- | --- |
 | Talos OS | `task upgrade-talos TO=v1.13.9` |
 | Kubernetes | `task upgrade-k8s TO=1.36.4` |
-| Cilium / cert-manager などの Helm チャート | `manifest/base/<app>/application.yaml` の `targetRevision` を上げて push (Argo CD が反映) |
+| Cilium / cert-manager などの Helm チャート | `manifest/base/infra/<app>/application.yaml` の `targetRevision` を上げて push (Argo CD が反映) |
 
 ### Talos OS
 

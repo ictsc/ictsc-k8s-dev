@@ -1,0 +1,23 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: regalia
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: regalia
+  source:
+    repoURL: git@github.com:ictsc/ictsc-k8s-dev.git
+    targetRevision: refs/heads/main
+    path: manifest/base/apps/regalia/workload/overlays/dev
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: scoreserver
+  syncPolicy:
+    syncOptions:
+      - ServerSideApply=true
+      - CreateNamespace=true
+    automated:
+      prune: true
+      selfHeal: true
