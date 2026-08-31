@@ -9,7 +9,7 @@ images:
     newTag: sha-44aa601
   - name: frontend
     newName: ghcr.io/ictsc/ictsc-regalia/frontend
-    newTag: sha-44aa601
+    newTag: sha-ab139f0
 
 patches:
   - path: httproute-patch.yaml
