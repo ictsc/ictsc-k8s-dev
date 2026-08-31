@@ -115,3 +115,18 @@ spec:
     - group: ""
       kind: Service
       name: oauth2-proxy
+---
+apiVersion: gateway.networking.k8s.io/v1beta1
+kind: ReferenceGrant
+metadata:
+  name: scoreserver-to-oauth2-proxy
+  namespace: oauth2-proxy
+spec:
+  from:
+    - group: gateway.networking.k8s.io
+      kind: HTTPRoute
+      namespace: scoreserver
+  to:
+    - group: ""
+      kind: Service
+      name: oauth2-proxy

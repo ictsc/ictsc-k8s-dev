@@ -27,7 +27,8 @@ config:
       secretEnv: OAUTH2_PROXY_CLIENT_SECRET
       redirectURIs:
         - https://httpbin.k8s-dev.ictsc.net/oauth2/callback
-        - https://grafana.k8s-dev.ictsc.net/oauth2/callback
+        - https://contest.k8s-dev.ictsc.net/oauth2/callback
+        - https://admin-contest.k8s-dev.ictsc.net/oauth2/callback
     - id: argocd
       name: Argo CD
       secretEnv: ARGOCD_CLIENT_SECRET

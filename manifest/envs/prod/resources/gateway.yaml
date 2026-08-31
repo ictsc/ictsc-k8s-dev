@@ -57,3 +57,5 @@ spec:
     - argocd.k8s.ictsc.net
     - dex.k8s.ictsc.net
     - httpbin.k8s.ictsc.net
+    - contest.k8s.ictsc.net
+    - admin-contest.k8s.ictsc.net

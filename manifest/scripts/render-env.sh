@@ -26,6 +26,12 @@ gen="# このファイルは \`task render-env-values\` が terraform output か
 cluster_id=1
 [ "${env}" = "prod" ] && cluster_id=2
 
+regalia_oauth2_redirect_uris=""
+if [ "${env}" = "dev" ]; then
+  regalia_oauth2_redirect_uris="        - https://contest.${domain}/oauth2/callback
+        - https://admin-contest.${domain}/oauth2/callback"
+fi
+
 # Helm values
 cat > "${d}/values/cilium.yaml" <<EOF
 ${gen}
@@ -129,7 +135,7 @@ config:
       secretEnv: OAUTH2_PROXY_CLIENT_SECRET
       redirectURIs:
         - https://httpbin.${domain}/oauth2/callback
-        - https://grafana.${domain}/oauth2/callback
+${regalia_oauth2_redirect_uris}
     - id: argocd
       name: Argo CD
       secretEnv: ARGOCD_CLIENT_SECRET
@@ -227,6 +233,8 @@ spec:
     - dex.${domain}
     - httpbin.${domain}
     - grafana.${domain}
+    - contest.${domain}
+    - admin-contest.${domain}
 EOF
 
 cat > "${d}/resources/cluster-issuer.yaml" <<EOF
@@ -414,6 +422,21 @@ spec:
     - group: gateway.networking.k8s.io
       kind: HTTPRoute
       namespace: httpbin
+  to:
+    - group: ""
+      kind: Service
+      name: oauth2-proxy
+---
+apiVersion: gateway.networking.k8s.io/v1beta1
+kind: ReferenceGrant
+metadata:
+  name: scoreserver-to-oauth2-proxy
+  namespace: oauth2-proxy
+spec:
+  from:
+    - group: gateway.networking.k8s.io
+      kind: HTTPRoute
+      namespace: scoreserver
   to:
     - group: ""
       kind: Service
