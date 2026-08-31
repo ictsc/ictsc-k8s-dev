@@ -8,7 +8,6 @@ resources:
   - ./resources/alertmanager-discord.yaml
   - ./resources/rbac-oidc.yaml
   - ./resources/httproutes.yaml
-  - ./resources/regalia-postgres.yaml
 
 patches:
   - target: {kind: Application, name: cilium}
@@ -41,3 +40,8 @@ patches:
       - op: add
         path: /spec/sources/0/helm/valueFiles/-
         value: $values/manifest/envs/dev/values/oauth2-proxy.yaml
+  - target: {kind: Application, name: regalia-postgres}
+    patch: |-
+      - op: add
+        path: /spec/sources/0/helm/valueFiles/-
+        value: $values/manifest/envs/dev/values/regalia-postgres.yaml
