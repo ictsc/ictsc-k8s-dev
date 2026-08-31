@@ -10,6 +10,13 @@ resources:
   - ./resources/httproutes.yaml
 
 patches:
+  - target: {kind: Application}
+    patch: |-
+      - op: add
+        path: /spec/info
+        value:
+          - name: Environment
+            value: dev
   - target: {kind: Application, name: cilium}
     patch: |-
       - op: add
