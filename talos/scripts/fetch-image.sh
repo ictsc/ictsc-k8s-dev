@@ -4,9 +4,9 @@
 set -euo pipefail
 
 TALOS_VERSION="${TALOS_VERSION:?TALOS_VERSION is required (e.g. v1.13.8)}"
-# 拡張機能なしの標準スキーマ ID
-# curl -X POST --data-binary 'customization: {}' https://factory.talos.dev/schematics
-TALOS_SCHEMATIC="${TALOS_SCHEMATIC:-376567988ad370138ad8b2698212367b8edcb69b5fd68c80be1f2ec7d603b4ba}"
+# talos/schematic.yaml から生成した ID。Longhorn 用の iscsi-tools と
+# util-linux-tools を含む。TALOS_SCHEMATIC で明示的に上書きできる。
+TALOS_SCHEMATIC="${TALOS_SCHEMATIC:-613e1592b2da41ae5e265e8789429f22e121aab91cb4deb6bc3c0b6262961245}"
 
 script_dir="$(cd "$(dirname "$0")" && pwd)"
 image_dir="${script_dir}/../image"
@@ -14,9 +14,10 @@ mkdir -p "${image_dir}"
 
 raw="${image_dir}/nocloud-amd64-${TALOS_VERSION}.raw"
 zst="${raw}.zst"
+marker="${raw}.schematic"
 url="https://factory.talos.dev/image/${TALOS_SCHEMATIC}/${TALOS_VERSION}/nocloud-amd64.raw.zst"
 
-if [ -f "${raw}" ]; then
+if [ -f "${raw}" ] && [ -f "${marker}" ] && [ "$(cat "${marker}")" = "${TALOS_SCHEMATIC}" ]; then
   echo "==> ${raw} は取得済みなのでスキップ"
   exit 0
 fi
@@ -35,5 +36,6 @@ curl -fSL --retry 5 --retry-all-errors --retry-delay 10 -o "${zst}" "${url}"
 echo "==> 展開: ${raw}"
 zstd -d -f "${zst}" -o "${raw}"
 rm -f "${zst}"
+printf '%s\n' "${TALOS_SCHEMATIC}" >"${marker}"
 
 ls -lh "${raw}"

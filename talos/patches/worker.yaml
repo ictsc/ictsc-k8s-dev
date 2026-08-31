@@ -2,3 +2,26 @@
 machine:
   nodeLabels:
     node.kubernetes.io/role: worker
+  kubelet:
+    # Talos の UserVolume を kubelet と Longhorn Pod から見えるようにする。
+    extraMounts:
+      - destination: /var/mnt/longhorn
+        type: bind
+        source: /var/mnt/longhorn
+        options:
+          - bind
+          - rshared
+          - rw
+---
+# worker の非 system virtio ディスクを Longhorn 専用領域として初期化する。
+# Terraform では OS ディスクの次に専用 SSD を接続している。
+apiVersion: v1alpha1
+kind: UserVolumeConfig
+name: longhorn
+provisioning:
+  diskSelector:
+    match: "!system_disk && disk.transport == 'virtio'"
+  minSize: 10GB
+  grow: true
+filesystem:
+  type: xfs

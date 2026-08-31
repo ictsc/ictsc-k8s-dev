@@ -7,6 +7,8 @@ env:
 vars:
   # renovate: datasource=github-releases depName=siderolabs/talos
   TALOS_VERSION: v1.13.9
+  # talos/schematic.yaml (Longhorn 用 system extensions 入り)
+  TALOS_SCHEMATIC: 613e1592b2da41ae5e265e8789429f22e121aab91cb4deb6bc3c0b6262961245
   TF_INPUT_JSON: '{{.ROOT_DIR}}/talos/build/talos-input.json'
   # Gateway API の CRD。ExternalAuth フィルタ (GEP-1494) を使うので
   # standard ではなく experimental チャネルを入れる必要がある。
@@ -142,7 +144,7 @@ tasks:
   fetch-talos-image:
     desc: Talos の nocloud イメージを取得
     cmds:
-      - TALOS_VERSION={{.TALOS_VERSION}} ./talos/scripts/fetch-image.sh
+      - TALOS_VERSION={{.TALOS_VERSION}} TALOS_SCHEMATIC={{.TALOS_SCHEMATIC}} ./talos/scripts/fetch-image.sh
 
   apply-network:
     desc: グローバルIPを確定させるためネットワークだけ先に作る
@@ -238,6 +240,29 @@ tasks:
     dir: terraform
     cmds:
       - terraform apply -auto-approve
+
+  stage-worker-config:
+    desc: worker の Talos machine config を次回再起動時の適用としてステージする
+    deps:
+      - task: talos-config
+    cmds:
+      - |
+        set -eu
+        cd terraform
+        INPUT=$(terraform output -json talos_input)
+        EP=$(echo "${INPUT}" | jq -r '[.nodes[] | select(.role=="controlplane") | .external_ip][0]')
+        CLUSTER=$(echo "${INPUT}" | jq -r '.cluster_name')
+        cd ..
+
+        echo "${INPUT}" | jq -r '.nodes[] | select(.role=="worker") | "\(.hostname) \(.internal_ip)"' \
+          | while read -r HOST INTERNAL; do
+              echo "==> ${HOST} の設定をステージ"
+              TALOS_EP="${EP}" ./talos/scripts/talosctl-via-bastion.sh \
+                -n "${INTERNAL}" apply-config --mode=staged \
+                -f "talos/build/${CLUSTER}/config/${HOST}.yaml"
+            done
+
+        echo "==> ステージ完了。task upgrade-talos TO={{.TALOS_VERSION}} で順次再起動してください"
 
   apply:
     desc: インフラを構築 (イメージ取得 -> ネットワーク -> Talos設定生成 -> 全体apply)
@@ -627,7 +652,7 @@ tasks:
           echo "==> ${HOST} を更新 (endpoint: ${EP})"
           # --drain は既定 true なので cordon + evict は talosctl がやる
           TALOS_EP="${EP}" ./talos/scripts/talosctl-via-bastion.sh -n "${INTERNAL}" upgrade \
-            -i "ghcr.io/siderolabs/installer:${TO}"
+            -i "factory.talos.dev/installer/{{.TALOS_SCHEMATIC}}:${TO}"
 
           echo "==> ${HOST} が Ready になるのを待つ"
           until [ "$(kubectl get node "${HOST}" -o jsonpath='{.status.conditions[?(@.type=="Ready")].status}' 2>/dev/null)" = "True" ]; do

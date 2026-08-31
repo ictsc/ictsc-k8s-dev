@@ -24,6 +24,23 @@ resource "sakura_disk" "worker_node" {
   }
 }
 
+# Longhorn のレプリカデータ専用。OS ディスクと障害・容量を分離する。
+# dev のみに作成し、worker へ2本目の virtio ディスクとして接続する。
+resource "sakura_disk" "longhorn" {
+  count = local.longhorn_enabled ? local.worker_node_count : 0
+
+  name      = "${local.name}-worker-${count.index + 1}-longhorn"
+  tags      = [var.prefix, local.env, "worker-node", "longhorn"]
+  plan      = "ssd"
+  connector = "virtio"
+  size      = var.longhorn_disk_size[local.env]
+
+  timeouts = {
+    create = "1h"
+    delete = "1h"
+  }
+}
+
 resource "sakura_server" "worker_node" {
   count = local.worker_node_count
 
@@ -31,7 +48,10 @@ resource "sakura_server" "worker_node" {
   tags   = [var.prefix, local.env, "worker-node"]
   core   = var.worker_node_cpu[local.env]
   memory = var.worker_node_mem[local.env]
-  disks  = [sakura_disk.worker_node[count.index].id]
+  disks = concat(
+    [sakura_disk.worker_node[count.index].id],
+    local.longhorn_enabled ? [sakura_disk.longhorn[count.index].id] : [],
+  )
 
   cdrom_id         = sakura_cdrom.node_config["${local.name}-worker-${count.index + 1}"].id
   interface_driver = "virtio"

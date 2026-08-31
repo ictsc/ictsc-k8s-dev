@@ -186,3 +186,13 @@ variable "worker_node_disk" {
     prod = 80
   }
 }
+
+# Longhorn のレプリカ保存用ディスク。0 の環境には作成しない。
+variable "longhorn_disk_size" {
+  type        = map(number)
+  description = "worker ごとに追加する Longhorn 専用 SSD の容量 (GiB、0 なら無効)"
+  default = {
+    dev  = 20
+    prod = 0
+  }
+}

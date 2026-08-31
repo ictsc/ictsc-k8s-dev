@@ -1,0 +1,7 @@
+customization:
+  systemExtensions:
+    officialExtensions:
+      # Longhorn がボリュームをアタッチするために必要。
+      - siderolabs/iscsi-tools
+      # Longhorn の filesystem trim (fstrim) に必要。
+      - siderolabs/util-linux-tools

@@ -1,0 +1,31 @@
+# Talos worker の専用 UserVolume (/var/mnt/longhorn) を利用する。
+global:
+  nodeSelector:
+    node.kubernetes.io/role: worker
+
+preUpgradeChecker:
+  # GitOps では Helm hook Job の更新が Argo CD と競合するため無効化する。
+  jobEnabled: false
+
+persistence:
+  createStorageClass: true
+  # 既存 PVC を意図せず NFS から切り替えない。利用時は明示的に longhorn を指定する。
+  defaultClass: false
+  defaultClassReplicaCount: 3
+  defaultFsType: xfs
+  reclaimPolicy: Delete
+  volumeBindingMode: WaitForFirstConsumer
+  dataEngine: v1
+
+defaultSettings:
+  defaultDataPath: /var/mnt/longhorn
+  defaultReplicaCount: '{"v1":"3","v2":"3"}'
+  systemManagedComponentsNodeSelector: node.kubernetes.io/role:worker
+  replicaAutoBalance: best-effort
+  allowCollectingLonghornUsageMetrics: false
+
+metrics:
+  serviceMonitor:
+    enabled: true
+    additionalLabels:
+      release: kube-prometheus-stack

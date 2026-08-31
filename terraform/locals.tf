@@ -11,6 +11,7 @@ locals {
 
   control_plane_count = var.control_plane[local.env]
   worker_node_count   = var.worker_node[local.env]
+  longhorn_enabled    = var.longhorn_disk_size[local.env] > 0
 
   external_netmask = var.external_subnet[local.env]
   external_gateway = sakura_internet.k8s_external.gateway

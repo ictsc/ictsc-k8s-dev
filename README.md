@@ -27,6 +27,7 @@ ictsc-k8s-dev/
 - **IaC**: Terraform (`sacloud/sakura` v3.12.7) + Terraform workspace で `dev` / `prod` を分離
 - **GitOps**: Argo CD (app-of-apps)
 - **監視**: Prometheus / Alertmanager / Grafana、Grafana Alloy + Loki（Pod ログを 7 日保持）
+- **ストレージ**: NFS CSI（既定）+ Longhorn（dev、worker 3台の専用SSDへ3レプリカ）
 - **入口**: Cilium Gateway API + cert-manager (Let's Encrypt / HTTP-01)
 - **認証**: Dex (GitHub) + oauth2-proxy を Gateway API の ExternalAuth で前段に置く
 - **ノードのスペック** (`terraform/vars.tf`)
@@ -55,6 +56,32 @@ ip_addresses[cp+2+wk]             踏み台
 
 必要なグローバルIP数は `cp + worker + 3` (VIP 2個 + 踏み台 1個)。
 netmask は後から変更できない (`terraform/vars.tf` の WARNING を参照) ので余裕を持たせている。
+
+### Longhorn (dev)
+
+dev の各 worker に20GiB SSDを1本追加し、Longhorn v1.12.1のV1 Data Engineで
+3レプリカの分散ブロックストレージとして使う。Talos側では専用ディスクを
+`UserVolumeConfig` でXFSに初期化し、`/var/mnt/longhorn` にマウントする。
+
+Longhornには `iscsi-tools` と `util-linux-tools` が必要なため、
+`talos/schematic.yaml` に両system extensionを定義している。既存クラスタへ導入する順序は次の通り。
+
+```console
+# 専用SSDの作成・接続と、最新machine configの生成
+$ task select-dev
+$ task apply
+
+# worker用configを次回再起動時の適用としてステージ
+$ task stage-worker-config
+
+# 拡張入りImage Factory installerで全ノードを1台ずつ更新する。
+# ステージしたworker configもこの再起動で有効になる。
+$ task upgrade-talos TO=v1.13.9
+```
+
+その後、このリポジトリをpushするとArgo CDが `longhorn-system` にLonghornを導入する。
+`longhorn` StorageClassは作成するが既定にはせず、既存の `nfs` を既定のまま維持する。
+Longhornを使うPVCは `storageClassName: longhorn` を明示すること。
 
 ### Talos の設定をどうやってノードに届けるか
 
@@ -637,7 +664,8 @@ machine config は STATE パーティションに残るので消えない。
 > schematic に system extension を足した場合は、installer イメージを
 > `ghcr.io/siderolabs/installer` ではなく
 > `factory.talos.dev/installer/<schematic>` に変える必要がある。
-> 現在の schematic は `customization: {}` (拡張なし) なので素の installer で等価。
+> 現在はLonghorn用の `iscsi-tools` と `util-linux-tools` を含むため、
+> `task upgrade-talos` は `talos/schematic.yaml` に対応するImage Factory installerを使う。
 
 ### Kubernetes
 
