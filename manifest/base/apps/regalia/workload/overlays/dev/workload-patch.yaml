@@ -1,0 +1,16 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: scoreserver-backend
+spec:
+  template:
+    spec:
+      containers:
+        - name: scoreserver
+          args:
+            - --dev
+            - --contestant.http-addr=0.0.0.0:8080
+            - --contestant.route-prefix=/api
+            - --admin.http-addr=0.0.0.0:8081
+            - --admin.auth-config-file=/etc/ictscore/admin-auth-config.yaml
+            - --admin.auth-policy-file=/etc/ictscore/admin-auth-policy.csv

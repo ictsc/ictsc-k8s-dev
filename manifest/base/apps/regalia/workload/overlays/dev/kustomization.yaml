@@ -6,13 +6,18 @@ namespace: scoreserver
 images:
   - name: backend
     newName: ghcr.io/ictsc/ictsc-regalia/backend
-    newTag: sha-44aa601
+    newTag: sha-f19af1e
   - name: frontend
     newName: ghcr.io/ictsc/ictsc-regalia/frontend
-    newTag: sha-ab139f0
+    newTag: sha-f19af1e
+  - name: toolbox
+    newName: ghcr.io/ictsc/ictsc-regalia/toolbox
+    newTag: sha-f19af1e
 
 patches:
   - path: httproute-patch.yaml
+  - path: workload-patch.yaml
+  - path: secret-provider-patch.yaml
   - target:
       group: gateway.networking.k8s.io
       version: v1

@@ -15,12 +15,6 @@ spec:
         - path:
             type: PathPrefix
             value: /api
-      filters:
-        - type: URLRewrite
-          urlRewrite:
-            path:
-              type: ReplacePrefixMatch
-              replacePrefixMatch: /
       backendRefs:
         - name: scoreserver-backend
           port: 8080
@@ -49,15 +43,9 @@ spec:
         - path:
             type: PathPrefix
             value: /api
-      filters:
-        - type: URLRewrite
-          urlRewrite:
-            path:
-              type: ReplacePrefixMatch
-              replacePrefixMatch: /
       backendRefs:
         - name: scoreserver-backend
-          port: 8080
+          port: 8081
     - matches:
         - path:
             type: PathPrefix

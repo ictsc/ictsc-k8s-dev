@@ -62,3 +62,9 @@ patches:
       - op: replace
         path: /spec/applicationRefs/0/images/1/commonUpdateSettings/allowTags
         value: 'regexp:^v[0-9]+\.[0-9]+\.[0-9]+$'
+      - op: replace
+        path: /spec/applicationRefs/0/images/2/commonUpdateSettings/updateStrategy
+        value: semver
+      - op: replace
+        path: /spec/applicationRefs/0/images/2/commonUpdateSettings/allowTags
+        value: 'regexp:^v[0-9]+\.[0-9]+\.[0-9]+$'

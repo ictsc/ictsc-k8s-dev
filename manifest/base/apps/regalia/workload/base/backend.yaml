@@ -31,17 +31,54 @@ spec:
         - name: scoreserver
           image: backend
           imagePullPolicy: Always
+          args:
+            - --contestant.http-addr=0.0.0.0:8080
+            - --contestant.route-prefix=/api
+            - --admin.http-addr=0.0.0.0:8081
+            - --admin.auth-config-file=/etc/ictscore/admin-auth-config.yaml
+            - --admin.auth-policy-file=/etc/ictscore/admin-auth-policy.csv
+          env:
+            - name: PGHOST
+              valueFrom:
+                secretKeyRef:
+                  name: postgres-app
+                  key: host
+            - name: PGDATABASE
+              value: ictscore
+            - name: PGUSER
+              valueFrom:
+                secretKeyRef:
+                  name: postgres-app
+                  key: username
+            - name: PGPASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: postgres-app
+                  key: password
+            - name: REDIS_URL
+              value: redis://valkey-proxy:6379/0
+            - name: DISCORD_CLIENT_ID
+              valueFrom:
+                secretKeyRef:
+                  name: discord-oauth-client
+                  key: client-id
+            - name: DISCORD_CLIENT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: discord-oauth-client
+                  key: client-secret
           ports:
-            - name: http
+            - name: contestant
               containerPort: 8080
-          readinessProbe:
-            httpGet:
-              path: /health
-              port: http
-          livenessProbe:
-            httpGet:
-              path: /health
-              port: http
+            - name: admin
+              containerPort: 8081
+          volumeMounts:
+            - name: config
+              mountPath: /etc/ictscore
+              readOnly: true
+            - name: discord-oauth-client
+              mountPath: /run/secrets/discord-oauth-client
+              readOnly: true
           resources:
             requests:
               cpu: 50m
@@ -55,6 +92,16 @@ spec:
             capabilities:
               drop:
                 - ALL
+      volumes:
+        - name: config
+          configMap:
+            name: scoreserver-backend-config
+        - name: discord-oauth-client
+          csi:
+            driver: secrets-store.csi.k8s.io
+            readOnly: true
+            volumeAttributes:
+              secretProviderClass: discord-oauth-client
 ---
 apiVersion: v1
 kind: Service
@@ -64,6 +111,11 @@ spec:
   selector:
     app.kubernetes.io/name: scoreserver-backend
   ports:
-    - name: http
+    - name: contestant
       port: 8080
-      targetPort: http
+      targetPort: contestant
+      appProtocol: kubernetes.io/h2c
+    - name: admin
+      port: 8081
+      targetPort: admin
+      appProtocol: kubernetes.io/h2c

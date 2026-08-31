@@ -2,6 +2,14 @@ resources:
   - ./backend.yaml
   - ./frontend.yaml
   - ./httproute.yaml
+  - ./migrate.yaml
+  - ./secret-provider.yaml
+
+configMapGenerator:
+  - name: scoreserver-backend-config
+    files:
+      - admin-auth-config.yaml
+      - admin-auth-policy.csv
 
 labels:
   - pairs:

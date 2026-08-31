@@ -17,18 +17,26 @@ spec:
     - namePattern: regalia
       images:
         - alias: backend
-          imageName: ghcr.io/ictsc/ictsc-regalia/backend:sha-44aa601
+          imageName: ghcr.io/ictsc/ictsc-regalia/backend:sha-f19af1e
           commonUpdateSettings:
             updateStrategy: newest-build
-            allowTags: regexp:^sha-[0-9a-f]{7,40}$
+            allowTags: regexp:^sha-f19af1e$
           manifestTargets:
             kustomize:
               name: ghcr.io/ictsc/ictsc-regalia/backend
         - alias: frontend
-          imageName: ghcr.io/ictsc/ictsc-regalia/frontend:sha-44aa601
+          imageName: ghcr.io/ictsc/ictsc-regalia/frontend:sha-f19af1e
           commonUpdateSettings:
             updateStrategy: newest-build
-            allowTags: regexp:^sha-[0-9a-f]{7,40}$
+            allowTags: regexp:^sha-f19af1e$
           manifestTargets:
             kustomize:
               name: ghcr.io/ictsc/ictsc-regalia/frontend
+        - alias: toolbox
+          imageName: ghcr.io/ictsc/ictsc-regalia/toolbox:sha-f19af1e
+          commonUpdateSettings:
+            updateStrategy: newest-build
+            allowTags: regexp:^sha-f19af1e$
+          manifestTargets:
+            kustomize:
+              name: ghcr.io/ictsc/ictsc-regalia/toolbox
