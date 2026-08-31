@@ -11,23 +11,10 @@ metadata:
     - resources-finalizer.argocd.argoproj.io
 spec:
   project: default
-  # Helm chart は提供されておらず、upstream の kustomize ディレクトリを直接参照する。
-  # control plane が 3 台あるので leader election ありの ha を使う。
   source:
     repoURL: https://github.com/alex1989hu/kubelet-serving-cert-approver.git
     targetRevision: v0.11.0
-    # deploy/ha を使うが、レプリカは 1 に落とす。
-    #
-    # このバイナリは既定でリーダー選出をする (ha=true)。
-    # ha オーバーレイは leases の Role を持っているので権限は足りるが、
-    # 2 レプリカだと待機系がリーダーになるまで :8080 を listen せず、
-    # liveness probe に殺され続ける (実測: 14時間で 283 回再起動)。
-    # 一方 standalone オーバーレイは base しか参照せず leases の Role が無いため、
-    # リーダー選出が RBAC で弾かれて今度は全部落ちる。
-    # → ha のまま 1 レプリカにするのが、権限も揃い待機系も生まれない唯一の形。
-    #
-    # kubelet の serving 証明書の更新は頻繁ではないので、
-    # 1 レプリカが数十秒落ちても実害はない。
+    # standaloneはleader election用RBACがないため、haを1 replicaで使う。
     path: deploy/ha
     kustomize:
       replicas:

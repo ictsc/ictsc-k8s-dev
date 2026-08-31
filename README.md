@@ -12,9 +12,9 @@ ictsc-k8s-dev/
 ├── terraform/  (さくらのクラウドのリソース定義。provider は sacloud/sakura)
 ├── talos/      (Talos の machine config パッチと生成スクリプト)
 ├── manifest/   (Kubernetes マニフェスト。Argo CD の app-of-apps)
-│   ├── base/     (env 共通の Helm values)
-│   ├── envs/     (env ごとの Application と生成物。手で編集しない)
-│   └── scripts/  (envs/ を terraform output から生成する)
+│   ├── base/     (env 共通の Helm values と workload)
+│   ├── envs/     (env ごとの Application・values・クラスタリソース)
+│   └── scripts/  (env 固有の values / resources を terraform output から生成する)
 │
 ├── aqua.yaml     (CLI のバージョン固定)
 └── Taskfile.yaml (タスク定義)
@@ -268,6 +268,35 @@ GitHub App (または OAuth App) は `./init.sh` より先に用意しておく�
 `.envrc` に足して `direnv allow` するか `task reset-env` でやり直す。
 `argocd-repo-key` は `gh` で deploy key を登録するので、リポジトリの admin 権限が要る。
 どちらも作成済みなら status 判定でスキップされる。
+
+### Argo CD Application の追加
+
+dev と prod は別クラスタなので、`manifest/envs/dev` と
+`manifest/envs/prod` に Application を明示的に置く。差分を追うためだけの
+base / patch は作らず、共通化よりも「その環境で何が動くか」の読みやすさを優先する。
+
+外部 Git リポジトリのマニフェストは、Application の `spec.source` で指定する。
+
+```yaml
+source:
+  repoURL: git@github.com:owner/repository.git
+  targetRevision: main
+  path: deploy/overlays/dev
+```
+
+追加した Application は同じディレクトリの `kustomization.yaml` に登録する。
+private GitHub リポジトリなら、Argo CD へ read-only deploy key も登録する。
+
+```console
+$ task argocd-repo-key REPO=owner/repository
+```
+
+`targetRevision` は dev では `main`、prod では release tag または commit SHA への固定を基本とする。
+このリポジトリ内のマニフェストを指す場合だけ `manifest/base` を使う。
+
+Application YAML は手で編集する。`task render-env-values` が更新するのは、先頭に生成コメントが
+ある `values/` と `resources/` だけ。未構築の環境では生成ファイルがまだ存在しないため、
+その環境の root Application は `task up` で生成を済ませてから適用する。
 
 > [!WARNING]
 > **`terraform apply` がサーバ作成中にタイムアウトや 409 で落ちたら、孤児サーバを疑うこと。**
