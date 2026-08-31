@@ -1,0 +1,11 @@
+namespace: monitoring
+
+configMapGenerator:
+  - name: loki-alert-rules
+    files:
+      - kubernetes-events.yaml
+
+generatorOptions:
+  disableNameSuffixHash: true
+  annotations:
+    argocd.argoproj.io/sync-wave: "-1"

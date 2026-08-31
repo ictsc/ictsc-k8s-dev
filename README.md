@@ -279,6 +279,10 @@ manifest/base/alloy/
 └── values.yaml
 ```
 
+Helm chart外の追加リソースは同じアプリ配下の`resources/`に置く。
+Lokiのalert ruleは`configMapGenerator`でConfigMapにし、Loki Applicationの
+Git sourceからHelm chartと一緒に同期する。
+
 dev / prod の `kustomization.yaml` は `manifest/base` を読み、環境固有valuesが必要な
 Applicationだけ`patches` で参照を追加する。Alloyのように差分がないものはpatch不要。
 root Applicationは参照先が異なるため、`manifest/root-dev.yaml` と `root-prod.yaml` に分ける。

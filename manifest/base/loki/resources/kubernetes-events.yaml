@@ -1,0 +1,21 @@
+groups:
+  - name: kubernetes-events
+    interval: 1m
+    rules:
+      - alert: KubernetesWarningEvent
+        expr: |
+          sum by (namespace, reason, kind, name) (
+            count_over_time(
+              {log_type="kubernetes_event"}
+                | logfmt
+                | type="Warning"
+              [5m]
+            )
+          ) > 0
+        for: 1m
+        labels:
+          severity: warning
+          category: kubernetes-event
+        annotations:
+          summary: Kubernetes Warning Eventを検出しました
+          description: 直近5分にWarning Eventが発生しています。namespace、reason、kind、nameラベルを確認してください。
