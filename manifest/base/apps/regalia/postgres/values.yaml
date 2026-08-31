@@ -1,0 +1,26 @@
+fullnameOverride: postgres
+
+version:
+  postgresql: "16"
+
+cluster:
+  instances: 1
+  storage:
+    size: 1Gi
+    storageClass: nfs
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+  enableSuperuserAccess: false
+  initdb:
+    database: ictscore
+    owner: app
+  monitoring:
+    enabled: true
+    prometheusRule:
+      additionalLabels:
+        release: kube-prometheus-stack

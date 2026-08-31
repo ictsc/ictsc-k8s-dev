@@ -40,6 +40,11 @@ patches:
       - op: replace
         path: /spec/source/path
         value: manifest/base/apps/regalia/workload/overlays/prod
+  - target: {kind: Application, name: regalia-postgres}
+    patch: |-
+      - op: add
+        path: /spec/sources/0/helm/valueFiles/-
+        value: $values/manifest/envs/prod/values/regalia-postgres.yaml
   - target: {kind: ImageUpdater, name: regalia}
     patch: |-
       - op: replace

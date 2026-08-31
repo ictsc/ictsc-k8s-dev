@@ -1,0 +1,48 @@
+fullnameOverride: valkey-proxy
+
+resources:
+  requests:
+    cpu: 25m
+    memory: 64Mi
+  limits:
+    cpu: 250m
+    memory: 256Mi
+
+initResources:
+  requests:
+    cpu: 10m
+    memory: 16Mi
+  limits:
+    cpu: 100m
+    memory: 64Mi
+
+readinessProbe:
+  enabled: true
+
+dataStorage:
+  enabled: true
+  requestedSize: 1Gi
+  className: nfs
+  keepPvc: true
+
+metrics:
+  enabled: true
+  exporter:
+    resources:
+      requests:
+        cpu: 10m
+        memory: 32Mi
+      limits:
+        cpu: 100m
+        memory: 128Mi
+    securityContext:
+      allowPrivilegeEscalation: false
+      readOnlyRootFilesystem: true
+      runAsNonRoot: true
+      runAsUser: 1000
+      runAsGroup: 1000
+      capabilities:
+        drop:
+          - ALL
+  serviceMonitor:
+    enabled: true

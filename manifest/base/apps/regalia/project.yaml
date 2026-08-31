@@ -8,6 +8,8 @@ metadata:
 spec:
   sourceRepos:
     - git@github.com:ictsc/ictsc-k8s-dev.git
+    - https://cloudnative-pg.github.io/charts
+    - https://valkey.io/valkey-helm/
   destinations:
     - server: https://kubernetes.default.svc
       namespace: scoreserver
