@@ -11,3 +11,6 @@ spec:
   destinations:
     - server: https://kubernetes.default.svc
       namespace: scoreserver
+  clusterResourceWhitelist:
+    - group: ""
+      kind: Namespace

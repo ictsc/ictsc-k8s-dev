@@ -8,8 +8,10 @@ resources:
   - ./infra/alloy/application.yaml
   - ./infra/metrics-server/application.yaml
   - ./infra/argocd/application.yaml
+  - ./infra/argocd-image-updater/application.yaml
   - ./infra/dex/application.yaml
   - ./infra/oauth2-proxy/application.yaml
   - ./apps/httpbin/application.yaml
   - ./apps/regalia/project.yaml
   - ./apps/regalia/application.yaml
+  - ./apps/regalia/image-updater.yaml

@@ -316,17 +316,15 @@ Application YAML は手で編集する。`task render-env-values` が更新す�
 その環境の root Application は `task up` で生成を済ませてから適用する。
 
 RegaliaのKubernetesリソースとデプロイ中のimage versionは
-`manifest/base/apps/regalia`で管理する。`ictsc-regalia`のActionsはimageを発行した後、
-対応するoverlayのbackend/frontendを同じcommitで更新する。
+`manifest/base/apps/regalia`で管理する。`ictsc-regalia`のActionsはimageの発行までとし、
+Argo CD Image Updaterが対応するoverlayのbackend/frontendをGit write-backで更新する。
 
 ```text
 main push  -> dev へ sha-<commit>
 v1.2.3 tag -> prod へ v1.2.3
 ```
 
-Actionsからこのリポジトリへ書き込むGitHub AppにはContentsのwrite権限を与え、
-Regalia側に`K8S_CONFIG_APP_CLIENT_ID` variableと`K8S_CONFIG_APP_PRIVATE_KEY` secretを設定する。
-そのAppを`ictsc-k8s-dev`にinstallし、mainのbranch rulesで必要な場合はpushを許可する。
+Image UpdaterはArgo CDに登録済みのこのリポジトリのSSH認証情報を再利用する。
 
 > [!WARNING]
 > **`terraform apply` がサーバ作成中にタイムアウトや 409 で落ちたら、孤児サーバを疑うこと。**
