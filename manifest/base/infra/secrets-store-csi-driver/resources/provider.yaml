@@ -1,0 +1,88 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: sakuracloud-provider
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: sakuracloud-provider
+rules:
+  - apiGroups: [""]
+    resources: [secrets]
+    resourceNames: [csi-secrets-store-sakuracloud-provider-credentials]
+    verbs: [get]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: sakuracloud-provider
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: sakuracloud-provider
+subjects:
+  - kind: ServiceAccount
+    name: sakuracloud-provider
+---
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: sakuracloud-provider
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: sakuracloud-provider
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: sakuracloud-provider
+    spec:
+      serviceAccountName: sakuracloud-provider
+      automountServiceAccountToken: false
+      nodeSelector:
+        kubernetes.io/os: linux
+      containers:
+        - name: provider
+          image: ghcr.io/tosuke/secrets-store-csi-driver-provider-sakuracloud:v0.2.1
+          imagePullPolicy: IfNotPresent
+          args:
+            - --endpoint=unix:///run/provider/sakuracloud.sock
+            - --healthz-addr=[::]:8080
+          env:
+            - name: SAKURACLOUD_PROFILE_DIR
+              value: /run
+            - name: SAKURACLOUD_PROFILE
+              value: default
+          livenessProbe:
+            httpGet:
+              path: /livez
+              port: 8080
+          resources:
+            requests:
+              cpu: 10m
+              memory: 20Mi
+            limits:
+              cpu: 50m
+              memory: 64Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            runAsUser: 0
+            capabilities:
+              drop:
+                - ALL
+          volumeMounts:
+            - name: provider-socket
+              mountPath: /run/provider
+            - name: credentials
+              mountPath: /run/.usacloud/default
+              readOnly: true
+      volumes:
+        - name: provider-socket
+          hostPath:
+            path: /run/secrets-store-csi-providers
+            type: DirectoryOrCreate
+        - name: credentials
+          secret:
+            secretName: csi-secrets-store-sakuracloud-provider-credentials

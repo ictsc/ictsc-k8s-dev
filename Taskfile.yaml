@@ -453,6 +453,27 @@ tasks:
         echo "==> monitoring/loki-object-storage を作成しました"
         echo "==> monitoring/tempo-object-storage を作成しました"
 
+  secret-store-credentials:
+    desc: SakuraCloud Secret Manager の CSI provider 認証情報を作る
+    status:
+      - kubectl -n kube-system get secret csi-secrets-store-sakuracloud-provider-credentials >/dev/null 2>&1
+    cmds:
+      - |
+        set -eu
+        if [ -z "${SAKURACLOUD_ACCESS_TOKEN:-}" ] || [ -z "${SAKURACLOUD_ACCESS_TOKEN_SECRET:-}" ]; then
+          echo "SAKURACLOUD_ACCESS_TOKEN / SAKURACLOUD_ACCESS_TOKEN_SECRET が設定されていません" >&2
+          exit 1
+        fi
+        config=$(jq -cn \
+          --arg token "${SAKURACLOUD_ACCESS_TOKEN}" \
+          --arg secret "${SAKURACLOUD_ACCESS_TOKEN_SECRET}" \
+          '{AccessToken: $token, AccessTokenSecret: $secret}')
+        kubectl -n kube-system create secret generic \
+          csi-secrets-store-sakuracloud-provider-credentials \
+          --from-literal=config.json="${config}" \
+          --dry-run=client -o yaml | kubectl apply -f - >/dev/null
+        echo "==> SakuraCloud Secret Manager の CSI 認証情報を作成しました"
+
   argocd-repo-key:
     desc: Argo CD が private GitHub リポジトリを読むための deploy key を登録
     deps:
@@ -550,6 +571,7 @@ tasks:
     deps:
       - task: argocd-repo-keys
       - task: auth-secrets
+      - task: secret-store-credentials
     vars:
       ENV: { sh: 'cd terraform && terraform workspace show' }
     cmds:
