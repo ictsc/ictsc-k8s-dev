@@ -1,39 +1,22 @@
 # このファイルは `task render-env-values` が terraform output から生成する
-#
-# さくらの NFS アプライアンス (terraform/nfs.tf) を使う StorageClass。
-# サーバは内部セグメントに居るので、ノードからは eth1 経由で見える。
-#
-# csi-driver-nfs が subDir をプロビジョニングする。NFS の共有パスは
-# アプライアンスの既定である /export をそのまま使う。
 apiVersion: storage.k8s.io/v1
 kind: StorageClass
 metadata:
   name: nfs
   annotations:
     argocd.argoproj.io/sync-wave: "-1"
-    # クラスタ唯一の StorageClass なので既定にしておく
     storageclass.kubernetes.io/is-default-class: "true"
 provisioner: nfs.csi.k8s.io
 parameters:
   server: 192.168.100.150
   share: /export
-  # subDir は指定しない。指定しないとドライバが PV 名でディレクトリを掘るので
-  # PV ごとに分かれる。テンプレート変数のつもりで固定文字列を渡すと、
-  # 全 PV が同じディレクトリを共有して最初に書いた Pod の所有物になる。
-  #
-  # NFS では fsGroup が効かない (ブロックデバイスではないため kubelet が
-  # chown してくれない)。既定の 0755 + root 所有だと、非 root で動くコンテナ
-  # (Prometheus は UID 65534) が書けずに permission denied で落ちる。
+  # subDir を省略すると PV ごとに分離される。NFS では fsGroup が効かない。
   mountPermissions: "0777"
 reclaimPolicy: Delete
 volumeBindingMode: Immediate
 allowVolumeExpansion: true
 mountOptions:
-  # さくらの NFS アプライアンスは NFSv4.0 まで。実測:
-  #   4.1 -> mount.nfs: Protocol not supported
-  #   4.0 -> 成功
-  #   3   -> rpc.statd が要る (CSI の node コンテナには居ない)
-  # csi-driver-nfs の既定は 4.1 なので、明示しないとプロビジョニングが失敗する。
+  # さくらの NFS アプライアンスは NFSv4.0 まで。
   - nfsvers=4.0
   - hard
   - noatime

@@ -1,20 +1,8 @@
-# パケットフィルタ (eth0 = グローバル側のみ)
-#
 # WARNING: さくらのクラウドのパケットフィルタは **受信のみ・ステートレス**。
-#          自分から出した通信の戻りパケットも明示的に許可しないと落ちる。
-#          (マニュアル: TCP/UDP の 32768-61000 を許可すること)
-#          忘れると DNS・NTP・イメージ pull・ACME・apiserver から Dex への
-#          問い合わせが全て死ぬ。末尾の deny より前に local.pf_return を必ず置く。
-#
-# NOTE: 内部セグメント (eth1) にはフィルタを付けない。etcd のピア通信 (2379/2380)
-#       と kubelet はそちらを通る。apiserver から kubelet への接続も
-#       kubelet-preferred-address-types で InternalIP を優先させてある。
+# 戻り通信 (32768-61000) を deny より前に許可する。対象は eth0 のみ。
 
 locals {
-  # Talos の apid (50000) と trustd (50001) は、下の戻り通信 (32768-61000) の
-  # レンジに *入ってしまう*。許可を先に書いても、送信元が一致しなかった分は
-  # そのまま戻り通信のルールに拾われて素通りする = 実質全世界に開く。
-  # 明示的に閉じてから戻り通信を許可すること。順序が意味を持つ。
+  # 50000/50001 は戻り通信レンジ内なので、明示 deny を先に置く。
   pf_deny_talos_api = [
     {
       protocol         = "tcp"
@@ -30,7 +18,6 @@ locals {
     },
   ]
 
-  # 戻り通信。ステートレスなので必須 (上の WARNING を参照)
   pf_return = [
     {
       protocol         = "tcp"
@@ -45,8 +32,7 @@ locals {
       description      = "戻り: 自分から出した UDP の応答 (DNS / NTP)"
     },
     {
-      # 2番目以降のフラグメントにはポート番号が無いため、
-      # 明示的に通さないと大きな UDP 応答 (DNS) などが落ちる
+      # 2番目以降のフラグメントにはポート番号がない。
       protocol    = "fragment"
       allow       = true
       description = "フラグメントされたパケット"
@@ -69,8 +55,7 @@ locals {
     },
   ]
 
-  # Ingress VIP は Cilium の L2 Announcement でノード間を移動するため、
-  # cp / worker のどのノードにも着地しうる。全ノードで開けておく。
+  # Ingress VIP は全ノードに着地しうる。
   pf_ingress = [
     {
       protocol         = "tcp"
@@ -86,13 +71,7 @@ locals {
     },
   ]
 
-  # 6443 は送信元を絞らない。
-  #
-  # 主防御は TLS + クライアント証明書 / OIDC + RBAC であって送信元 IP ではない。
-  # 絞ると (a) メンバーの回線が変わるたびに締め出される (b) KubePrism の
-  # endpoints には control plane の *グローバル* IP も含まれる
-  # (talosctl get kubeprismendpoints で確認できる) ため、ノード間の接続まで
-  # 巻き込んで壊す、という運用コストの方が大きい。
+  # 6443 は KubePrism のノード間接続にも使うため、TLS・OIDC・RBAC で保護する。
   pf_kube_api = [
     {
       protocol         = "tcp"
@@ -102,14 +81,7 @@ locals {
     },
   ]
 
-  # 一方 apid (50000) はノードを直接操作でき、reset でディスクまで消せる。
-  # ここは踏み台からのみに絞る。
-  #
-  # 作業端末の IP を許可する変数も用意していたが、tfstate は共有されているのに
-  # 変数はマシンごとのローカルファイルだったため、apply したマシンによって
-  # ルールが増えたり消えたりしていた (CI から apply すると必ず消える)。
-  # 手元から talosctl を打つときは踏み台経由の SSH トンネルを使う。
-  #
+  # apid は踏み台経由の SSH トンネルだけに限定する。
   # NOTE: さくらのパケットフィルタは SourceNetwork のマスク長を 0〜31 しか
   #       受け付けない。単一ホストは "/32" を付けずに書くこと (API が 400 を返す)。
   pf_talos_api = [
@@ -122,9 +94,7 @@ locals {
     },
   ]
 
-  # trustd。worker が control plane から証明書を受け取るのに使う。
-  # apid のサーバ証明書の更新にも必要なので、塞ぐと後から静かに壊れる。
-  # 外に出す必要はないため、送信元はクラスタのセグメント自身に限定する。
+  # trustd は証明書発行・更新に必要。クラスタの外部セグメント内だけ許可する。
   pf_trustd = [
     {
       protocol         = "tcp"

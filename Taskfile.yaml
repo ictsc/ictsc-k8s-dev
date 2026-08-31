@@ -16,9 +16,7 @@ vars:
   ACME_EMAIL: '{{.ACME_EMAIL | default "TODO-set-me@ictsc.net"}}'
 
 tasks:
-  ########################################
   # 共通
-  ########################################
   check-binary:
     desc: 指定されたバイナリがインストールされているか確認
     internal: true
@@ -31,9 +29,7 @@ tasks:
           exit 1
         fi
 
-  ########################################
   # 初期化
-  ########################################
   init:
     desc: ワークスペースを初期化
     cmds:
@@ -125,9 +121,7 @@ tasks:
     cmds:
       - terraform init
 
-  ########################################
   # ワークスペース
-  ########################################
   show-ws:
     desc: ワークスペースを表示
     dir: terraform
@@ -144,9 +138,7 @@ tasks:
     cmds:
       - cd terraform && terraform workspace select -or-create prod
 
-  ########################################
   # Terraform / Talos
-  ########################################
   fetch-talos-image:
     desc: Talos の nocloud イメージを取得
     cmds:
@@ -171,14 +163,7 @@ tasks:
           BINARY: jq
           INSTALL_DOC: "aqua install で導入されます (aqua.yaml を参照)"
     cmds:
-      # 既にクラスタが在るのに talos/secrets.yaml が無い、という状態で走らせない。
-      #
-      # secrets.yaml はクラスタの PKI 本体で gitignore されている。別のマシンに
-      # clone しただけだと存在せず、gen-config.sh は「初回構築だ」と判断して
-      # *別のクラスタの* 秘密情報を新規生成してしまう。そのまま apply すると
-      # CD-ROM が別 CA で署名された machine config で上書きされ、ノードが
-      # 再ブートストラップした瞬間にクラスタへ参加できなくなる。
-      # talosconfig も別 CA になるので talosctl が一切通らなくなる。
+      # 既存クラスタに別の PKI を生成・適用しない。
       - |
         set -eu
         if [ ! -f talos/secrets.yaml ]; then
@@ -198,12 +183,7 @@ tasks:
       - mkdir -p talos/build
       - cd terraform && terraform output -json talos_input > {{.TF_INPUT_JSON}}
       - ./talos/scripts/gen-config.sh {{.TF_INPUT_JSON}}
-      # 生成した PKI が「今動いているクラスタのもの」か実際に通信して確かめる。
-      #
-      # ファイルの有無だけでは足りない。secrets.yaml が *存在するが別物* という
-      # 状態 (別マシンで一度生成してしまった後など) は素通りしてしまい、
-      # そのまま apply すると CD-ROM が別 CA の config で上書きされる。
-      # 生成された talosconfig で control plane に繋がるかどうかが唯一の確実な判定。
+      # 生成した PKI が既存クラスタのものか接続して確認する。
       - |
         set -eu
         if ! (cd terraform && terraform state list 2>/dev/null) | grep -q '^sakura_server\.'; then
@@ -275,12 +255,7 @@ tasks:
   prune-nodes:
     desc: Terraform 上に存在しないのに残っている Node オブジェクトを削除
     cmds:
-      # サーバを消しても Kubernetes の Node は残り続ける。Terraform は Kubernetes を
-      # 知らないし、Talos も他ノードの Node を消したりはしないため、ここで面倒をみる。
-      #
-      # NOTE: drain はここではやらない。この時点で対象のサーバは Terraform に
-      #       消された後で、退避先も退避元も存在しないため意味がない。
-      #       台数を減らすときは vars.tf を書き換える *前* に drain しておくこと。
+      # 台数削減時の drain は vars.tf を変える前に行う。
       - |
         set -eu
         # 初回構築ではまだクラスタが無い
@@ -323,9 +298,7 @@ tasks:
     cmds:
       - terraform destroy
 
-  ########################################
   # クラスタのブートストラップ
-  ########################################
   talos-bootstrap:
     desc: etcd を初期化してクラスタを立ち上げる (初回のみ)
     deps:
@@ -340,10 +313,7 @@ tasks:
         until ./talos/scripts/talosctl-via-bastion.sh -n "${CP1}" version --short >/dev/null 2>&1; do sleep 10; done
         ./talos/scripts/talosctl-via-bastion.sh -n "${CP1}" bootstrap || true
 
-        # ここで talosctl health を回してはいけない。
-        # health は「全 k8s ノードが Ready」「全 Pod が Running」まで見るが、
-        # CNI は task bootstrap-cluster で後入れするため、この時点では絶対に満たされず
-        # --wait-timeout ぶん丸ごと待たされる。健全性の確認は task health で CNI 投入後に行う。
+        # CNI 投入前なので、ここでは talosctl health を実行しない。
         echo "==> etcd が Running になるのを待つ"
         until ./talos/scripts/talosctl-via-bastion.sh -n "${CP1}" service etcd 2>/dev/null | grep -qE '^STATE +Running'; do sleep 10; done
         echo "==> etcd OK"
@@ -383,9 +353,7 @@ tasks:
   install-gateway-api-crds:
     desc: Gateway API の CRD (experimental チャネル) を導入
     cmds:
-      # standard ではなく experimental チャネルを入れる。
-      # HTTPRoute の ExternalAuth フィルタ (GEP-1494) は standard の CRD には
-      # 含まれておらず、認証を持たないアプリを oauth2-proxy で守るのに必要。
+      # ExternalAuth フィルタには experimental CRD が必要。
       - >-
         kubectl apply --server-side
         -f https://github.com/kubernetes-sigs/gateway-api/releases/download/{{.GATEWAY_API_VERSION}}/experimental-install.yaml
@@ -400,11 +368,9 @@ tasks:
     vars:
       ENV: { sh: 'cd terraform && terraform workspace show' }
     cmds:
-      # Cilium は gatewayAPI.enabled=true のとき起動時に Gateway API の CRD を見に行く。
-      # 無いと Gateway のサポートを諦めるので、必ず Cilium より先に入れる。
+      # Gateway API CRD は Cilium の起動前に入れる。
       - task: install-gateway-api-crds
-      # Argo CD が動くには CNI が要るので、Cilium と Argo CD だけ helm で先に入れる。
-      # 以降は Argo CD が同じ values を読んで自分ごと管理する。
+      # Cilium と Argo CD だけ先に Helm で入れ、以降は Argo CD に引き継ぐ。
       - helm repo add cilium https://helm.cilium.io/
       - helm repo add argo https://argoproj.github.io/argo-helm
       - helm repo update cilium argo
@@ -416,9 +382,7 @@ tasks:
         -f manifest/envs/{{.ENV}}/values/cilium.yaml
         --wait --timeout 10m
       - kubectl -n kube-system rollout status deploy/coredns --timeout=10m
-      # envs/<env>/resources/ はここで撒かない。ClusterIssuer や Certificate は
-      # cert-manager の CRD を必要とし、ExternalAuth 付きの HTTPRoute は
-      # oauth2-proxy より後でなければならない。順序は Argo CD の sync-wave に任せる。
+      # 残りの依存順序は Argo CD の sync-wave に任せる。
       - >-
         # renovate: datasource=helm depName=argo-cd registryUrl=https://argoproj.github.io/argo-helm
         helm upgrade --install argocd argo/argo-cd --version=10.2.3
@@ -544,14 +508,7 @@ tasks:
           BINARY: talosctl
           INSTALL_DOC: "aqua install で導入されます (aqua.yaml を参照)"
     cmds:
-      # talosctl health は指定したノード構成を「期待値」として突き合わせるので、
-      # control plane / worker を明示しないと "unexpected nodes" と言われる。
-      #
-      # ここで渡すのは内部 IP。etcd の advertisedSubnets も kubelet の
-      # nodeIP.validSubnets も内部セグメントに揃えてある (gen-config.sh 参照) ので、
-      # グローバル IP を渡すと "etcd member ips are not subset of
-      # control plane node ips" で落ちる。
-      # -e (endpoint) だけはグローバル IP。apid が内部 IP へ中継してくれる。
+      # endpoint は外部 IP、検査対象ノードは etcd/kubelet と同じ内部 IP を渡す。
       - |
         cd terraform
         EP=$(terraform output -json control_plane_ips | jq -r '.[0]')
@@ -570,14 +527,8 @@ tasks:
     cmds:
       - kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath='{.data.password}' | base64 -d && echo
 
-  ########################################
   # アップグレード
-  ########################################
-  #
-  # WARNING: terraform/vars.tf の talos_version を上げても OS は上がらない。
-  #          あれは「これから作るノードのディスクの元になるアーカイブ」であって、
-  #          稼働中のノードには一切影響しない (sakura_disk は ignore_changes で
-  #          守ってある)。OS の更新は必ずこの upgrade-talos で行うこと。
+  # terraform/vars.tf の talos_version は新規ノード用。稼働中の更新は upgrade-talos を使う。
 
   upgrade-talos:
     desc: 'Talos OS を1台ずつ更新 (例: task upgrade-talos TO=v1.13.9)'
@@ -645,13 +596,7 @@ tasks:
           BINARY: talosctl
           INSTALL_DOC: "aqua install で導入されます (aqua.yaml を参照)"
     cmds:
-      # talosctl upgrade-k8s は1回で全ノードを面倒みる (apiserver -> controller-manager
-      # -> scheduler -> kubelet の順序も、イメージの事前 pull も自前でやる)。
-      # ノードごとにループする必要はない。
-      #
-      # NOTE: --to を省くと talosctl 自身が持つ既定値になる。v1.13.8 の既定は 1.36.2 で、
-      #       現在動いているのは 1.36.3 のため、省略すると *ダウングレード* になる。
-      #       そのため TO は必須にしてある。
+      # talosctl upgrade-k8s が全ノードを順番に更新する。意図しない版を避けるため TO は必須。
       - |
         set -eu
         TO="{{.TO}}"

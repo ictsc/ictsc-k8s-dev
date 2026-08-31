@@ -1,4 +1,3 @@
-# LoadBalancer Service に払い出すグローバルIPのプール
 # このファイルは `task render-env-values` が terraform output から生成する
 apiVersion: cilium.io/v2
 kind: CiliumLoadBalancerIPPool

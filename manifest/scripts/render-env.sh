@@ -1,7 +1,5 @@
 #!/usr/bin/env bash
-# terraform output 由来の env 固有の値 (VIP・ドメイン) をマニフェストに流し込む。
-# Taskfile の render-env-values から呼ばれる。
-#
+# terraform output 由来の値を環境別マニフェストに反映する。
 #   usage: render-env.sh <env> <cluster> <domain> <ingress-vip> <acme-email> <pod-subnet> <nfs-ip>
 set -euo pipefail
 
@@ -25,13 +23,10 @@ script_dir="$(cd "$(dirname "$0")" && pwd)"
 d="$(cd "${script_dir}/../envs/${env}" && pwd)"
 gen="# このファイルは \`task render-env-values\` が terraform output から生成する"
 
-# prod と dev で Cilium のクラスタ ID を分ける
 cluster_id=1
 [ "${env}" = "prod" ] && cluster_id=2
 
-########################################
 # Helm values
-########################################
 cat > "${d}/values/cilium.yaml" <<EOF
 ${gen}
 cluster:
@@ -46,7 +41,6 @@ global:
 
 configs:
   cm:
-    # clientSecret は argocd-oidc Secret から読む (Git には置かない)
     oidc.config: |
       name: Dex
       issuer: https://dex.${domain}
@@ -58,19 +52,17 @@ configs:
         - email
         - groups
   params:
-    # false だと Gateway からの平文リクエストに 307 を返し続けてループする
+    # Gateway との TLS 終端後のリダイレクトループを防ぐ。
     server.insecure: true
 
 server:
   service:
-    # VIP は Gateway が持つ
     type: ClusterIP
 EOF
 
 cat > "${d}/values/kube-prometheus-stack.yaml" <<EOF
 ${gen}
 grafana:
-  # クライアントシークレットは Secret grafana-oidc から環境変数で渡す
   envValueFrom:
     GF_AUTH_GENERIC_OAUTH_CLIENT_SECRET:
       secretKeyRef:
@@ -81,7 +73,6 @@ grafana:
       domain: grafana.${domain}
       root_url: https://grafana.${domain}
     auth:
-      # OIDC だけを入口にする。ローカルの admin は残すが導線からは隠す
       disable_login_form: false
       oauth_auto_login: false
     auth.generic_oauth:
@@ -92,8 +83,7 @@ grafana:
       auth_url: https://dex.${domain}/auth
       token_url: https://dex.${domain}/token
       api_url: https://dex.${domain}/userinfo
-      # Dex の github connector は groups を "<org>:<team>" で返す
-      # (org 名だけの "ictsc" は返らない)。ロールはここで振り分ける。
+      # Dex の groups は "<org>:<team>" 形式。
       role_attribute_path: contains(groups[*], 'ictsc:ictsc2026') && 'Admin' || 'Viewer'
       allow_assign_grafana_admin: true
 EOF
@@ -102,17 +92,13 @@ cat > "${d}/values/oauth2-proxy.yaml" <<EOF
 ${gen}
 extraArgs:
   oidc-issuer-url: https://dex.${domain}
-  # redirect-url は固定しない。oauth2-proxy は戻り先を相対パスでしか保持せず、
-  # callback を別ホストに置くとログイン後に元のアプリへ戻れない
+  # callback を保護対象の各ホストで完結させるため redirect-url は固定しない。
   cookie-domain: .${domain}
   whitelist-domain: .${domain}
-  # X-Forwarded-* を信用する送信元を Gateway (Envoy) が居る Pod CIDR に限定する。
-  # 未設定だと全 IP からの詐称を受け入れる
+  # X-Forwarded-* を信用する送信元を Gateway の Pod CIDR に限定する。
   trusted-proxy-ip: ${pod_subnet}
 EOF
 
-# 保護対象を増やすときは staticClients の redirectURIs に1行足すだけでよい。
-# GitHub 側に登録する callback は Dex の1本だけで固定。
 cat > "${d}/values/dex.yaml" <<EOF
 ${gen}
 config:
@@ -134,7 +120,6 @@ config:
         clientID: \$GITHUB_CLIENT_ID
         clientSecret: \$GITHUB_CLIENT_SECRET
         redirectURI: https://dex.${domain}/callback
-        # ここを通過できる GitHub organization
         orgs:
           - name: ictsc
 
@@ -142,7 +127,6 @@ config:
     - id: oauth2-proxy
       name: oauth2-proxy
       secretEnv: OAUTH2_PROXY_CLIENT_SECRET
-      # 保護対象アプリを増やしたらここに <host>/oauth2/callback を足す
       redirectURIs:
         - https://httpbin.${domain}/oauth2/callback
         - https://grafana.${domain}/oauth2/callback
@@ -156,9 +140,7 @@ config:
       secretEnv: GRAFANA_CLIENT_SECRET
       redirectURIs:
         - https://grafana.${domain}/login/generic_oauth
-    # kubectl (kubelogin) 用。CLI にクライアントシークレットは隠せないので
-    # public client にして PKCE で守る。redirectURI は kubelogin が
-    # ローカルに立てる一時サーバ。既定のポートを両方書いておく。
+    # kubelogin は public client + PKCE を使う。
     - id: kubernetes
       name: Kubernetes
       public: true
@@ -169,11 +151,8 @@ config:
         - http://127.0.0.1:18000
 EOF
 
-########################################
 # クラスタリソース
-########################################
 cat > "${d}/resources/cilium-lb-ip-pool.yaml" <<EOF
-# LoadBalancer Service に払い出すグローバルIPのプール
 ${gen}
 apiVersion: cilium.io/v2
 kind: CiliumLoadBalancerIPPool
@@ -189,8 +168,6 @@ EOF
 
 cat > "${d}/resources/gateway.yaml" <<EOF
 ${gen}
-#
-# Ingress VIP はこの Gateway が保持し、振り分けは HTTPRoute で行う。
 apiVersion: v1
 kind: Namespace
 metadata:
@@ -209,7 +186,6 @@ spec:
     - type: IPAddress
       value: "${vip}"
   listeners:
-    # cert-manager が ACME チャレンジ用の HTTPRoute をここに生やすので必須
     - name: http
       protocol: HTTP
       port: 80
@@ -236,24 +212,16 @@ metadata:
   name: external
   namespace: gateway
   annotations:
-    # Gateway と同じ wave に置く。Gateway の HTTPS listener はこの Certificate が作る
-    # Secret external-tls を要求し、逆にこの Certificate の HTTP-01 チャレンジは
-    # Gateway が無いと解けないという相互依存になっている。別々の wave に分けると
-    # Argo CD が Gateway の Healthy を待って次の wave に進まず、
-    # "Listener: Invalid CertificateRef" のまま永久に止まる。
+    # Gateway と Certificate は相互依存するため同じ wave に置く。
     argocd.argoproj.io/sync-wave: "-15"
-    # cert-manager の CRD は Argo CD が同期を始める時点ではまだ無い
-    # (cert-manager 自体が wave -20 の Application として入る)。
-    # Argo CD は実行前に全タスクを dry-run 検証するため、これが無いと
-    # "failed to discover server resources for group version cert-manager.io/v1"
-    # で同期プランごと却下され、cert-manager が永久に入らないデッドロックになる。
+    # cert-manager の CRD は wave -20 で作られる。
     argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
 spec:
   secretName: external-tls
   issuerRef:
     name: letsencrypt
     kind: ClusterIssuer
-  # HTTP-01 ではワイルドカードが取れないのでホストを列挙する
+  # HTTP-01 はワイルドカード証明書に対応しない。
   dnsNames:
     - argocd.${domain}
     - dex.${domain}
@@ -263,22 +231,13 @@ EOF
 
 cat > "${d}/resources/cluster-issuer.yaml" <<EOF
 ${gen}
-#
-# HTTP-01 を Gateway API の HTTPRoute で解く。cert-manager は Gateway を
-# 書き換えず、チャレンジ中だけ一時的な HTTPRoute を生やす。
 apiVersion: cert-manager.io/v1
 kind: ClusterIssuer
 metadata:
   name: letsencrypt
   annotations:
-    # Certificate より先に居ればよい。ACME アカウント登録に Gateway は不要なので
-    # Gateway (-15) より前の wave に置く。
     argocd.argoproj.io/sync-wave: "-16"
-    # cert-manager の CRD は Argo CD が同期を始める時点ではまだ無い
-    # (cert-manager 自体が wave -20 の Application として入る)。
-    # Argo CD は実行前に全タスクを dry-run 検証するため、これが無いと
-    # "failed to discover server resources for group version cert-manager.io/v1"
-    # で同期プランごと却下され、cert-manager が永久に入らないデッドロックになる。
+    # cert-manager の CRD は wave -20 で作られる。
     argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
 spec:
   acme:
@@ -297,41 +256,24 @@ EOF
 
 cat > "${d}/resources/storageclass-nfs.yaml" <<EOF
 ${gen}
-#
-# さくらの NFS アプライアンス (terraform/nfs.tf) を使う StorageClass。
-# サーバは内部セグメントに居るので、ノードからは eth1 経由で見える。
-#
-# csi-driver-nfs が subDir をプロビジョニングする。NFS の共有パスは
-# アプライアンスの既定である /export をそのまま使う。
 apiVersion: storage.k8s.io/v1
 kind: StorageClass
 metadata:
   name: nfs
   annotations:
     argocd.argoproj.io/sync-wave: "-1"
-    # クラスタ唯一の StorageClass なので既定にしておく
     storageclass.kubernetes.io/is-default-class: "true"
 provisioner: nfs.csi.k8s.io
 parameters:
   server: ${nfs_ip}
   share: /export
-  # subDir は指定しない。指定しないとドライバが PV 名でディレクトリを掘るので
-  # PV ごとに分かれる。テンプレート変数のつもりで固定文字列を渡すと、
-  # 全 PV が同じディレクトリを共有して最初に書いた Pod の所有物になる。
-  #
-  # NFS では fsGroup が効かない (ブロックデバイスではないため kubelet が
-  # chown してくれない)。既定の 0755 + root 所有だと、非 root で動くコンテナ
-  # (Prometheus は UID 65534) が書けずに permission denied で落ちる。
+  # subDir を省略すると PV ごとに分離される。NFS では fsGroup が効かない。
   mountPermissions: "0777"
 reclaimPolicy: Delete
 volumeBindingMode: Immediate
 allowVolumeExpansion: true
 mountOptions:
-  # さくらの NFS アプライアンスは NFSv4.0 まで。実測:
-  #   4.1 -> mount.nfs: Protocol not supported
-  #   4.0 -> 成功
-  #   3   -> rpc.statd が要る (CSI の node コンテナには居ない)
-  # csi-driver-nfs の既定は 4.1 なので、明示しないとプロビジョニングが失敗する。
+  # さくらの NFS アプライアンスは NFSv4.0 まで。
   - nfsvers=4.0
   - hard
   - noatime
@@ -339,20 +281,9 @@ EOF
 
 cat > "${d}/resources/rbac-oidc.yaml" <<EOF
 ${gen}
-#
-# Dex 経由で入ってきた GitHub ユーザに権限を渡す。
 # groups / username の prefix "oidc:" は control plane の
 # AuthenticationConfiguration (talos/scripts/gen-config.sh) と揃えること。
-#
-# Dex の github connector は orgs に teams を書いていなくても、groups claim を
-# "<org>:<team>" 形式で返す (実測: ictsc org / ictsc2026 team のユーザで
-# groups = ["ictsc:ictsc2026"])。org 名だけの "ictsc" は返ってこない。
-# RBAC にワイルドカードは書けないので、権限を渡す team をここに列挙する。
-# 新しい team (来年度など) を作ったらここに足すこと。
-#
-# 実際に何が来ているかは、ログイン後に ID トークンを見るのが早い:
-#   cat ~/.kube/cache/oidc-login/* | jq -r .id_token \
-#     | cut -d. -f2 | base64 -d 2>/dev/null | jq .groups
+# Dex の groups は "<org>:<team>" 形式。権限を渡す team を列挙する。
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
@@ -371,8 +302,6 @@ EOF
 
 cat > "${d}/resources/httproutes.yaml" <<EOF
 ${gen}
-#
-# HTTPRoute は backendRef と同じ namespace に置く (別なら ReferenceGrant が要る)。
 apiVersion: gateway.networking.k8s.io/v1
 kind: HTTPRoute
 metadata:
@@ -407,9 +336,7 @@ spec:
         - name: dex
           port: 5556
 ---
-# 認証を持たない httpbin を ExternalAuth で保護する。
-# sync-wave を遅らせるのは、認可バックエンドの Service が無い状態でこの Route が
-# 生えると Cilium が ext_authz フィルタを組まず素通しになるため。
+# 認可 Service より後に作り、httpbin を ExternalAuth で保護する。
 apiVersion: gateway.networking.k8s.io/v1
 kind: HTTPRoute
 metadata:
@@ -425,7 +352,6 @@ spec:
   hostnames:
     - httpbin.${domain}
   rules:
-    # OAuth のやり取りは保護対象から外し、このホスト自身で完結させる
     - matches:
         - path:
             type: PathPrefix
@@ -448,7 +374,6 @@ spec:
               namespace: oauth2-proxy
               port: 80
             http:
-              # Cookie が無いとログイン済み判定ができない
               allowedHeaders:
                 - Cookie
                 - X-Forwarded-Proto
@@ -461,9 +386,7 @@ spec:
         - name: httpbin
           port: 8080
 ---
-# Grafana は Dex と直接 OIDC でやり取りするので oauth2-proxy を挟まない。
-# 挟むと Dex に2回飛ばされて二重ログインになるうえ、Grafana 側で
-# ロールを振り分けるのに必要な groups クレームが受け取れない。
+# Grafana はロール判定に groups を使うため Dex と直接 OIDC 接続する。
 apiVersion: gateway.networking.k8s.io/v1
 kind: HTTPRoute
 metadata:

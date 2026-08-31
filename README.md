@@ -26,6 +26,7 @@ ictsc-k8s-dev/
 - **Kubernetes**: `v1.36.3` / CNI は Cilium (kube-proxy 置き換え)
 - **IaC**: Terraform (`sacloud/sakura` v3.12.7) + Terraform workspace で `dev` / `prod` を分離
 - **GitOps**: Argo CD (app-of-apps)
+- **監視**: Prometheus / Alertmanager / Grafana、Grafana Alloy + Loki（Pod ログを 7 日保持）
 - **入口**: Cilium Gateway API + cert-manager (Let's Encrypt / HTTP-01)
 - **認証**: Dex (GitHub) + oauth2-proxy を Gateway API の ExternalAuth で前段に置く
 - **ノードのスペック** (`terraform/vars.tf`)
@@ -299,6 +300,21 @@ GitHub App (または OAuth App) は `./init.sh` より先に用意しておく�
 # Argo CD の初期パスワード
 $ task argocd-password
 ```
+
+## ログ確認
+
+Grafana の **Explore** でデータソース `Loki` を選ぶと、Alloy が収集した全 namespace の
+Pod ログを検索できる。代表的な LogQL は次のとおり。
+
+```logql
+{namespace="kube-system"}
+{namespace="argocd", container="argocd-server"} |= "error"
+{app="httpbin"} | json
+```
+
+付与するラベルは `cluster` / `namespace` / `pod` / `container` / `node` / `app` / `job`。
+ログは Loki の NFS PVC (5Gi) に保存し、7 日を過ぎたデータを削除する。Alloy は
+Kubernetes API 経由で Pod ログを読むため、Talos 自体のサービスログは収集対象外。
 
 ## 名前解決 (DNS)
 
@@ -706,7 +722,6 @@ Secret は Git に置かないので、クラスタに直接作る (Argo CD の�
 - ノード名の DNS 登録 (VIP は Cloudflare に登録済み。ノードは `/etc/hosts` 運用)
 - IPv6 (`enable_ipv6 = false`。drove は dual stack)
 - ストレージ (Rook/Ceph)
-- 監視スタック
 - kubelogin (kubectl の OIDC 認証。Dex は導入済み)
 - Secret の Git 管理 (SOPS / sealed-secrets)
 - CI (terraform fmt / tflint / helm lint)

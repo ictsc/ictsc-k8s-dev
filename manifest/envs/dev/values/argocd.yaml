@@ -4,7 +4,6 @@ global:
 
 configs:
   cm:
-    # clientSecret は argocd-oidc Secret から読む (Git には置かない)
     oidc.config: |
       name: Dex
       issuer: https://dex.k8s-dev.ictsc.net
@@ -16,10 +15,9 @@ configs:
         - email
         - groups
   params:
-    # false だと Gateway からの平文リクエストに 307 を返し続けてループする
+    # Gateway との TLS 終端後のリダイレクトループを防ぐ。
     server.insecure: true
 
 server:
   service:
-    # VIP は Gateway が持つ
     type: ClusterIP

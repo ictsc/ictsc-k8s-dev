@@ -1,6 +1,4 @@
 # このファイルは `task render-env-values` が terraform output から生成する
-#
-# Ingress VIP はこの Gateway が保持し、振り分けは HTTPRoute で行う。
 apiVersion: v1
 kind: Namespace
 metadata:
@@ -19,7 +17,6 @@ spec:
     - type: IPAddress
       value: "27.133.146.104"
   listeners:
-    # cert-manager が ACME チャレンジ用の HTTPRoute をここに生やすので必須
     - name: http
       protocol: HTTP
       port: 80
@@ -46,24 +43,16 @@ metadata:
   name: external
   namespace: gateway
   annotations:
-    # Gateway と同じ wave に置く。Gateway の HTTPS listener はこの Certificate が作る
-    # Secret external-tls を要求し、逆にこの Certificate の HTTP-01 チャレンジは
-    # Gateway が無いと解けないという相互依存になっている。別々の wave に分けると
-    # Argo CD が Gateway の Healthy を待って次の wave に進まず、
-    # "Listener: Invalid CertificateRef" のまま永久に止まる。
+    # Gateway と Certificate は相互依存するため同じ wave に置く。
     argocd.argoproj.io/sync-wave: "-15"
-    # cert-manager の CRD は Argo CD が同期を始める時点ではまだ無い
-    # (cert-manager 自体が wave -20 の Application として入る)。
-    # Argo CD は実行前に全タスクを dry-run 検証するため、これが無いと
-    # "failed to discover server resources for group version cert-manager.io/v1"
-    # で同期プランごと却下され、cert-manager が永久に入らないデッドロックになる。
+    # cert-manager の CRD は wave -20 で作られる。
     argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
 spec:
   secretName: external-tls
   issuerRef:
     name: letsencrypt
     kind: ClusterIssuer
-  # HTTP-01 ではワイルドカードが取れないのでホストを列挙する
+  # HTTP-01 はワイルドカード証明書に対応しない。
   dnsNames:
     - argocd.k8s-dev.ictsc.net
     - dex.k8s-dev.ictsc.net

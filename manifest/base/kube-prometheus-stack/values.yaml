@@ -75,6 +75,15 @@ grafana:
   persistence:
     enabled: true
     size: 1Gi
+  additionalDataSources:
+    - name: Loki
+      uid: loki
+      type: loki
+      access: proxy
+      url: http://loki-gateway.monitoring.svc.cluster.local
+      isDefault: false
+      jsonData:
+        maxLines: 1000
   # 公開は Cilium Gateway API + oauth2-proxy 側で行う
   ingress:
     enabled: false

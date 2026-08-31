@@ -1,0 +1,79 @@
+# 小規模クラスタ向けの単一プロセス構成。
+# NFS 全体が 20GB のため、ログ領域は 5Gi・保持期間は 7 日に絞る。
+deploymentMode: Monolithic
+
+loki:
+  auth_enabled: false
+  commonConfig:
+    replication_factor: 1
+  storage:
+    type: filesystem
+  schemaConfig:
+    configs:
+      - from: "2024-04-01"
+        store: tsdb
+        object_store: filesystem
+        schema: v13
+        index:
+          prefix: loki_index_
+          period: 24h
+  limits_config:
+    retention_period: 168h
+    allow_structured_metadata: true
+    volume_enabled: true
+  compactor:
+    retention_enabled: true
+    delete_request_store: filesystem
+
+singleBinary:
+  replicas: 1
+  persistence:
+    enabled: true
+    storageClass: nfs
+    size: 5Gi
+    # Argo CD の Application 削除や一時的な縮退でログを消さない。
+    whenDeleted: Retain
+    whenScaled: Retain
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      memory: 1Gi
+
+# Monolithic 以外の構成要素は明示的に停止する。
+backend:
+  replicas: 0
+read:
+  replicas: 0
+write:
+  replicas: 0
+
+# 小規模構成では memcached の既定値（特に chunks-cache 8Gi）が過大。
+chunksCache:
+  enabled: false
+resultsCache:
+  enabled: false
+
+# Alloy と Grafana はこの Service を利用する。
+gateway:
+  enabled: true
+
+# 各ノードから書き込み・読み出しを継続確認する。
+lokiCanary:
+  enabled: true
+  tolerations:
+    - key: node-role.kubernetes.io/control-plane
+      operator: Exists
+      effect: NoSchedule
+
+# 既存の Prometheus / Grafana / Alertmanager から Loki 自体も監視する。
+monitoring:
+  serviceMonitor:
+    enabled: true
+  dashboards:
+    enabled: true
+  rules:
+    enabled: true
+  alerts:
+    enabled: true

@@ -1,6 +1,4 @@
 # このファイルは `task render-env-values` が terraform output から生成する
-#
-# HTTPRoute は backendRef と同じ namespace に置く (別なら ReferenceGrant が要る)。
 apiVersion: gateway.networking.k8s.io/v1
 kind: HTTPRoute
 metadata:
@@ -35,9 +33,7 @@ spec:
         - name: dex
           port: 5556
 ---
-# 認証を持たない httpbin を ExternalAuth で保護する。
-# sync-wave を遅らせるのは、認可バックエンドの Service が無い状態でこの Route が
-# 生えると Cilium が ext_authz フィルタを組まず素通しになるため。
+# 認可 Service より後に作り、httpbin を ExternalAuth で保護する。
 apiVersion: gateway.networking.k8s.io/v1
 kind: HTTPRoute
 metadata:
@@ -53,7 +49,6 @@ spec:
   hostnames:
     - httpbin.k8s-dev.ictsc.net
   rules:
-    # OAuth のやり取りは保護対象から外し、このホスト自身で完結させる
     - matches:
         - path:
             type: PathPrefix
@@ -76,7 +71,6 @@ spec:
               namespace: oauth2-proxy
               port: 80
             http:
-              # Cookie が無いとログイン済み判定ができない
               allowedHeaders:
                 - Cookie
                 - X-Forwarded-Proto
@@ -89,9 +83,7 @@ spec:
         - name: httpbin
           port: 8080
 ---
-# Grafana は Dex と直接 OIDC でやり取りするので oauth2-proxy を挟まない。
-# 挟むと Dex に2回飛ばされて二重ログインになるうえ、Grafana 側で
-# ロールを振り分けるのに必要な groups クレームが受け取れない。
+# Grafana はロール判定に groups を使うため Dex と直接 OIDC 接続する。
 apiVersion: gateway.networking.k8s.io/v1
 kind: HTTPRoute
 metadata:
