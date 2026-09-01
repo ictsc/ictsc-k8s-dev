@@ -2,12 +2,18 @@
 .kube
 .terraform
 .terraform.tfstate*
+/bin/
+/.omni/
 
 # Talos の生成物・秘密情報
 /talos/build/
 /talos/secrets.yaml
 /talos/talosconfig
 /talos/image/
+
+# Omni のクライアント設定・認証鍵
+/omni/terraform/.terraform/
+/omni/infra-provider-sakura/config.yaml
 
 /.vscode/*
 !/.vscode/extensions.json

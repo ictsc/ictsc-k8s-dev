@@ -9,6 +9,8 @@ vars:
   TALOS_VERSION: v1.13.9
   # talos/schematic.yaml (Longhorn 用 system extensions 入り)
   TALOS_SCHEMATIC: 613e1592b2da41ae5e265e8789429f22e121aab91cb4deb6bc3c0b6262961245
+  # renovate: datasource=github-releases depName=siderolabs/omni
+  OMNI_VERSION: v1.8.0
   TF_INPUT_JSON: '{{.ROOT_DIR}}/talos/build/talos-input.json'
   # Gateway API の CRD。ExternalAuth フィルタ (GEP-1494) を使うので
   # standard ではなく experimental チャネルを入れる必要がある。
@@ -38,7 +40,8 @@ tasks:
       - task: init-tools
       - task: init-env
       - task: init-terraform
-      - chmod +x talos/scripts/*.sh
+      - task: init-omni-terraform
+      - chmod +x talos/scripts/*.sh omni/scripts/*.sh
 
   init-tools:
     desc: aqua で CLI を導入
@@ -122,6 +125,142 @@ tasks:
           INSTALL_DOC: "aqua install で導入されます (aqua.yaml を参照)"
     cmds:
       - terraform init
+
+  init-omni-terraform:
+    desc: Omni専用Terraformを初期化
+    dir: omni/terraform
+    deps:
+      - task: check-binary
+        vars:
+          BINARY: terraform
+          INSTALL_DOC: "aqua install で導入されます (aqua.yaml を参照)"
+    cmds:
+      - terraform init
+
+  plan-omni:
+    desc: Omni専用VMのTerraform planを表示 (リソースは作らない)
+    dir: omni/terraform
+    deps:
+      - task: init-omni-terraform
+    cmds:
+      - terraform fmt -check
+      - terraform validate
+      - terraform plan -input=false -var-file=../../terraform/terraform.tfvars
+
+  apply-omni:
+    desc: Omni専用VMを作成 (有料リソース。plan確認後にのみ実行)
+    dir: omni/terraform
+    deps:
+      - task: init-omni-terraform
+    cmds:
+      - terraform apply -var-file=../../terraform/terraform.tfvars
+
+  omni-dns:
+    desc: Omni用DNS Aレコードを表示
+    dir: omni/terraform
+    cmds:
+      - terraform output -json dns_records | jq -r 'to_entries[] | "\(.key) A \(.value)"'
+
+  fetch-omnictl:
+    desc: リポジトリ内binへomnictlを取得
+    cmds:
+      - OMNI_VERSION={{.OMNI_VERSION}} ./omni/scripts/fetch-omnictl.sh
+
+  configure-omni:
+    desc: 'OmniとDexをVMへ導入 (例: task configure-omni OMNI_ADMIN_EMAIL=admin@example.com)'
+    env:
+      OMNI_ADMIN_EMAIL: '{{.OMNI_ADMIN_EMAIL}}'
+      ACME_EMAIL: '{{.ACME_EMAIL}}'
+    cmds:
+      - |
+        set -eu
+        case "${OMNI_ADMIN_EMAIL}" in
+          *@*.*) ;;
+          *) echo "ERROR: OMNI_ADMIN_EMAILを指定してください" >&2; exit 1 ;;
+        esac
+        case "${ACME_EMAIL}" in
+          *@*.*) ;;
+          *) echo "ERROR: ACME_EMAILを.envrcに設定してください" >&2; exit 1 ;;
+        esac
+
+        IP=$(terraform -chdir=omni/terraform output -raw omni_ip)
+        REMOTE=/tmp/ictsc-omni-install
+        ssh "ubuntu@${IP}" "rm -rf '${REMOTE}' && install -d -m 0700 '${REMOTE}/scripts'"
+        scp omni/compose.yaml "ubuntu@${IP}:${REMOTE}/compose.yaml"
+        scp omni/scripts/install.sh "ubuntu@${IP}:${REMOTE}/scripts/install.sh"
+        ssh -t "ubuntu@${IP}" \
+          "sudo env OMNI_DOMAIN=omni.ictsc.net AUTH_DOMAIN=auth.omni.ictsc.net OMNI_PUBLIC_IP='${IP}' OMNI_ADMIN_EMAIL='${OMNI_ADMIN_EMAIL}' ACME_EMAIL='${ACME_EMAIL}' OMNI_VERSION='{{.OMNI_VERSION}}' bash '${REMOTE}/scripts/install.sh'"
+
+  configure-omni-github-sso:
+    desc: 既存devクラスタのDex Secretを使ってOmniにGitHub SSOを設定
+    cmds:
+      - |
+        set -eu
+        IP=$(terraform -chdir=omni/terraform output -raw omni_ip)
+        SUDO_PASSWORD=$(terraform -chdir=omni/terraform output -raw console_password)
+        REMOTE=/tmp/ictsc-omni-configure-github-sso.sh
+
+        kubectl -n dex get secret dex-secrets >/dev/null
+        scp omni/scripts/configure-github-sso.sh "ubuntu@${IP}:${REMOTE}"
+        {
+          printf '%s\n' "${SUDO_PASSWORD}"
+          kubectl -n dex get secret dex-secrets -o jsonpath='{.data.github-client-id}'
+          printf '\n'
+          kubectl -n dex get secret dex-secrets -o jsonpath='{.data.github-client-secret}'
+          printf '\n'
+        } | ssh "ubuntu@${IP}" "sudo -S bash '${REMOTE}'"
+
+  omni-import-dry-run:
+    desc: 既存devクラスタのOmni importを踏み台からdry-run
+    cmds:
+      - OMNI_VERSION={{.OMNI_VERSION}} ./omni/scripts/import-via-bastion.sh --dry-run
+
+  omni-import:
+    desc: 既存devクラスタをOmniへimportし、machine config backupをローカルへ回収
+    cmds:
+      - OMNI_VERSION={{.OMNI_VERSION}} ./omni/scripts/import-via-bastion.sh --apply
+
+  test-omni-infra-provider:
+    desc: Sakura Cloud用Omni infra providerをテスト
+    dir: omni/infra-provider-sakura
+    env:
+      GOCACHE: /tmp/ictsc-omni-sakura-gocache
+      GOMODCACHE: /tmp/ictsc-omni-sakura-gomodcache
+    cmds:
+      - go test ./...
+
+  build-omni-infra-provider:
+    desc: Sakura Cloud用Omni infra provider imageをローカルbuild
+    cmds:
+      - docker build -t omni-infra-provider-sakura:dev omni/infra-provider-sakura
+
+  configure-omni-infra-provider:
+    desc: 'Omni VMでSakura Cloud infra providerを起動 (OMNI_INFRA_PROVIDER_KEY必須)'
+    env:
+      OMNI_INFRA_PROVIDER_KEY: '{{.OMNI_INFRA_PROVIDER_KEY}}'
+      OMNI_VM_IP: '{{.OMNI_VM_IP}}'
+    cmds:
+      - |
+        set -eu
+        : "${OMNI_INFRA_PROVIDER_KEY:?Omniで作成したinfra provider keyを指定してください}"
+        : "${OMNI_VM_IP:?Omni VMのIPをOMNI_VM_IPで指定してください}"
+        : "${SAKURACLOUD_ACCESS_TOKEN:?SAKURACLOUD_ACCESS_TOKENが必要です}"
+        : "${SAKURACLOUD_ACCESS_TOKEN_SECRET:?SAKURACLOUD_ACCESS_TOKEN_SECRETが必要です}"
+        CONFIG=${SAKURA_PROVIDER_CONFIG_FILE:-omni/infra-provider-sakura/config.yaml}
+        test -f "${CONFIG}" || { echo "ERROR: ${CONFIG} がありません (config.example.yamlをコピーして編集してください)" >&2; exit 1; }
+        IP=${OMNI_VM_IP}
+        REMOTE=/tmp/ictsc-install-omni-infra-provider.sh
+        scp omni/scripts/install-infra-provider.sh "ubuntu@${IP}:${REMOTE}"
+        scp "${CONFIG}" "ubuntu@${IP}:/tmp/sakura-provider.yaml"
+        ssh "ubuntu@${IP}" "sudo install -m 0600 /tmp/sakura-provider.yaml /opt/omni/sakura-provider.yaml && rm -f /tmp/sakura-provider.yaml"
+        {
+          printf 'OMNI_ENDPOINT=https://omni.ictsc.net\n'
+          printf 'OMNI_SERVICE_ACCOUNT_KEY=%s\n' "${OMNI_INFRA_PROVIDER_KEY}"
+          printf 'SAKURACLOUD_ACCESS_TOKEN=%s\n' "${SAKURACLOUD_ACCESS_TOKEN}"
+          printf 'SAKURACLOUD_ACCESS_TOKEN_SECRET=%s\n' "${SAKURACLOUD_ACCESS_TOKEN_SECRET}"
+          printf 'SAKURACLOUD_ZONE=tk1b\n'
+        } | ssh "ubuntu@${IP}" "sudo install -m 0600 /dev/stdin /opt/omni/infra-provider-sakura.env"
+        ssh -t "ubuntu@${IP}" "sudo bash '${REMOTE}'"
 
   # ワークスペース
   show-ws:

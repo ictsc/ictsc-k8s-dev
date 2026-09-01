@@ -63,6 +63,25 @@ talosctl -n <cp-ip> -e <cp-ip> apply-config -f xxx.yaml
 
 ---
 
+## self-hosted Omni への移行方針
+
+Talos / Kubernetesの継続管理は、クラスタ外の専用Ubuntu VMで動かすself-hosted Omniへ
+移す。Omni自身を管理対象クラスタへ置く循環構成にはしない。単一VM + embedded etcdを
+採用し、VMスナップショットとOmniデータのバックアップで復旧する。
+
+既存クラスタは再構築せず `omnictl cluster import` を使う。手順は必ず
+`dry-run → import (locked) → 差分確認 → unlock → health確認` とする。unlock前なら
+importをabortし、保存されたmachine configを再適用して戻せる。
+
+移行が完了するまで、NoCloud cidata、`talos/secrets.yaml`、踏み台経由のtalosctlを
+削除しない。完了後はOmni cluster templateをGit上の正とし、cidata生成と手動upgrade
+Taskを別変更で撤去する。
+
+Omni用Terraformはクラスタ本体とstateを分離する。Omniのetcd暗号鍵、OIDC secret、
+admin認証情報をTerraform stateやGitへ入れない。
+
+---
+
 ## Talos ベストプラクティス（公式 v1.13 ベース）
 
 参考: https://docs.siderolabs.com/talos/v1.13/getting-started/prodnotes

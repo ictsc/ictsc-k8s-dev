@@ -1,0 +1,27 @@
+# Terraformなしでproviderを動かすための設定。bootstrapは共有リソースを
+# 名前で冪等作成する（既存IDを指定した場合はそちらを優先）。
+bootstrap:
+  enabled: true
+  internet_name: sakura-omni-internet
+  internet_mask: 27
+  internet_bandwidth_mbps: 100
+  external_ip_count: 8
+  internal_switch_name: sakura-omni-internal
+  internal_cidr_mask: 24
+  packet_filter_name: sakura-omni-filter
+  # 既存のTalosアーカイブを複製する場合だけ指定する。
+  # source_archive_id: "<official-talos-archive-id>"
+  # archive_name: sakura-omni-talos
+defaults:
+  zone: tk1b
+  # archive_id は source_archive_id から自動作成するか、既存IDを指定。
+  archive_id: ""
+  external_switch_id: ""
+  external_ip_pool: []
+  external_gateway: ""
+  external_netmask: 0
+  packet_filter_id: ""
+  internal_switch_id: ""
+  internal_ip_pool: []
+  internal_netmask: 0
+  nameservers: [210.188.224.10, 210.188.224.11]

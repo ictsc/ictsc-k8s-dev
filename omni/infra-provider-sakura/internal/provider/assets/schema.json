@@ -1,0 +1,32 @@
+{
+  "type": "object",
+  "properties": {
+    "zone": { "type": "string", "description": "Sakura Cloud zone.", "default": "tk1b" },
+    "archive_id": { "type": "string", "description": "Talos nocloud raw archive ID." },
+    "cpu": { "type": "integer", "description": "Number of vCPUs.", "default": 2, "minimum": 1 },
+    "memory_gib": { "type": "integer", "description": "Memory in GiB.", "default": 4, "minimum": 1 },
+    "disk_gib": { "type": "integer", "description": "OS disk size in GiB.", "default": 40, "minimum": 20 },
+    "data_disk_gib": { "type": "integer", "description": "Optional blank data disk size in GiB; zero disables it.", "default": 0, "anyOf": [{ "const": 0 }, { "minimum": 20 }] },
+    "external_switch_id": { "type": "string", "description": "Router+switch vSwitch ID for eth0." },
+    "external_ip_pool": {
+      "type": "array", "description": "Static IPv4 addresses available for eth0.", "minItems": 1,
+      "items": { "type": "string", "format": "ipv4" }
+    },
+    "external_gateway": { "type": "string", "format": "ipv4" },
+    "external_netmask": { "type": "integer", "minimum": 1, "maximum": 32, "default": 27 },
+    "packet_filter_id": { "type": "string", "description": "Packet filter attached to eth0." },
+    "internal_switch_id": { "type": "string", "description": "Private vSwitch ID for eth1." },
+    "internal_ip_pool": {
+      "type": "array", "description": "Static IPv4 addresses available for eth1.", "minItems": 1,
+      "items": { "type": "string", "format": "ipv4" }
+    },
+    "internal_netmask": { "type": "integer", "minimum": 1, "maximum": 32, "default": 24 },
+    "nameservers": {
+      "type": "array", "description": "Recursive DNS servers.",
+      "default": ["210.188.224.10", "210.188.224.11"],
+      "items": { "type": "string", "format": "ipv4" }
+    }
+  },
+  "required": ["cpu", "memory_gib", "disk_gib"],
+  "additionalProperties": false
+}

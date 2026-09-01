@@ -11,6 +11,7 @@ ictsc-k8s-dev/
 │
 ├── terraform/  (さくらのクラウドのリソース定義。provider は sacloud/sakura)
 ├── talos/      (Talos の machine config パッチと生成スクリプト)
+├── omni/       (self-hosted Omni のVM・Compose・移行runbook)
 ├── manifest/   (Kubernetes マニフェスト。Argo CD の app-of-apps)
 │   ├── base/     (apps / infra の Application・values・workload)
 │   ├── envs/     (env ごとの values・patch・クラスタリソース)
@@ -22,8 +23,8 @@ ictsc-k8s-dev/
 
 ## 構成
 
-- **OS**: Talos Linux `v1.13.8` (nocloud イメージ)
-- **Kubernetes**: `v1.36.3` / CNI は Cilium (kube-proxy 置き換え)
+- **OS**: Talos Linux `v1.13.9` (nocloud イメージ)
+- **Kubernetes**: `v1.36.4` / CNI は Cilium (kube-proxy 置き換え)
 - **IaC**: Terraform (`sacloud/sakura` v3.12.7) + Terraform workspace で `dev` / `prod` を分離
 - **GitOps**: Argo CD (app-of-apps)
 - **監視**: Prometheus / Alertmanager / Grafana、Grafana Alloy + Loki（Pod ログを 7 日保持）
@@ -101,6 +102,17 @@ CD-ROM としてアタッチ**している。Talos の nocloud プラットフ�
 > [!NOTE]
 > CD-ROM はあくまで**初回ブートストラップ用**。Talos は初回起動時に machine config を
 > STATE パーティションへ保存するので、構築後の設定変更は `talosctl apply-config` で行うこと。
+
+### self-hosted Omni への移行
+
+Talos / Kubernetesの構成・アップグレード・ノード交換を集約するため、クラスタ外の
+専用VMでself-hosted Omniを動かす。既存のdevクラスタは再構築せず、Omniのcluster
+importで移行する。import直後は `locked` のまま差分をレビューし、明示的なunlock後に
+管理を移管する。
+
+移行中はcidataと従来のtalosctl経路を巻き戻し用に維持する。unlockと健全性確認が
+終わるまで、既存のmachine config、PKI、CD-ROMを削除しない。構築と移行の詳細は
+[`omni/README.md`](omni/README.md) を参照。
 
 ## 必要なツール
 
@@ -279,6 +291,12 @@ $ task up
 | task | 内容 |
 | --- | --- |
 | `task fetch-talos-image` | Image Factory から nocloud の raw イメージを取得 |
+| `task plan-omni` | Omni専用VMのplanを表示（作成しない） |
+| `task apply-omni` | Omni専用VMを作成（有料リソース） |
+| `task configure-omni` | VM上にOmni + Dexを構成 |
+| `task test-omni-infra-provider` | さくらのクラウド用Omni infra providerをテスト |
+| `task configure-omni-infra-provider` | Omni VMでinfra providerを起動 |
+| `task omni-import-dry-run` | devクラスタのOmni importを踏み台からdry-run |
 | `task apply` | Terraform でインフラを構築 (上記 2 段構えを内包) |
 | `task talos-bootstrap` | `talosctl bootstrap` で etcd を初期化 |
 | `task kubeconfig` | kubeconfig を `.kube/config` に取得 |

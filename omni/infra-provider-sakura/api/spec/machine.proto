@@ -1,0 +1,14 @@
+syntax = "proto3";
+
+package sakura.provider.spec;
+
+option go_package = "github.com/ictsc/ictsc-k8s-dev/omni/infra-provider-sakura/api/spec";
+
+message MachineSpec {
+  string zone = 1;
+  string server_id = 2;
+  repeated string disk_ids = 3;
+  string cdrom_id = 4;
+  string external_ip = 5;
+  string internal_ip = 6;
+}

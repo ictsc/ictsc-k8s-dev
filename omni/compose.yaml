@@ -1,0 +1,65 @@
+services:
+  dex:
+    image: ghcr.io/dexidp/dex:v2.41.1
+    network_mode: host
+    restart: unless-stopped
+    command: ["dex", "serve", "/etc/dex/dex.yaml"]
+    volumes:
+      - /opt/omni/dex.yaml:/etc/dex/dex.yaml:ro
+      - /opt/omni/tls:/tls:ro
+
+  omni:
+    image: ghcr.io/siderolabs/omni:${OMNI_VERSION}
+    network_mode: host
+    restart: unless-stopped
+    cap_add:
+      - NET_ADMIN
+    devices:
+      - /dev/net/tun:/dev/net/tun
+    depends_on:
+      - dex
+    volumes:
+      - /opt/omni/tls:/tls:ro
+      - /opt/omni/omni.asc:/omni.asc:ro
+      - /var/lib/omni/etcd:/_out/etcd
+      - /var/lib/omni/sqlite:/_out/sqlite
+    command:
+      - --name=${OMNI_CLUSTER_NAME:-omni}
+      - --cert=/tls/fullchain.pem
+      - --key=/tls/privkey.pem
+      - --machine-api-cert=/tls/fullchain.pem
+      - --machine-api-key=/tls/privkey.pem
+      - --machine-api-bind-addr=0.0.0.0:8090
+      - --private-key-source=file:///omni.asc
+      - --event-sink-port=8091
+      - --bind-addr=0.0.0.0:443
+      - --k8s-proxy-bind-addr=0.0.0.0:8100
+      - --advertised-api-url=https://${OMNI_DOMAIN}/
+      - --machine-api-advertised-url=https://${OMNI_DOMAIN}:8090/
+      - --siderolink-wireguard-advertised-addr=${OMNI_PUBLIC_IP}:50180
+      - --advertised-kubernetes-proxy-url=https://${OMNI_DOMAIN}:8100/
+      - --auth-auth0-enabled=false
+      - --auth-oidc-enabled=true
+      - --auth-oidc-provider-url=https://${AUTH_DOMAIN}:5556
+      - --auth-oidc-client-id=omni
+      - --auth-oidc-client-secret=${OMNI_OIDC_CLIENT_SECRET}
+      - --auth-oidc-scopes=openid
+      - --auth-oidc-scopes=profile
+      - --auth-oidc-scopes=email
+      - --sqlite-storage-path=/_out/sqlite/omni.db
+      - --initial-users=${OMNI_ADMIN_EMAIL}
+
+  sakura-infra-provider:
+    profiles: ["infra-provider"]
+    image: ${OMNI_INFRA_PROVIDER_IMAGE:-sakura-omni-infra-provider:latest}
+    network_mode: host
+    restart: unless-stopped
+    env_file:
+      - /opt/omni/infra-provider-sakura.env
+    volumes:
+      - /opt/omni/sakura-provider.yaml:/etc/omni/sakura-provider.yaml:ro
+    command:
+      - --id=sakura
+      - --health-check-zone=tk1b
+    depends_on:
+      - omni
