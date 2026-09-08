@@ -812,13 +812,137 @@ $ task select-dev      # workspace は default から始まるので必ず選ぶ
   必ずどこかにバックアップすること (gitignore 済み)
 - `talos/talosconfig` — talosctl のクライアント証明書 (gitignore 済み)
 
-Secret は Git に置かないので、クラスタに直接作る (Argo CD の管理外)。
+Secret の値は Git に置かない。基盤の認証情報はクラスタに直接作る (Argo CD の管理外)。
 `task up` が下記を呼ぶので、通常は手で作る必要はない。
 
 | task | 作る Secret |
 | --- | --- |
 | `task auth-secrets` | `dex/dex-secrets` `oauth2-proxy/oidc` `argocd/argocd-oidc` |
 | `task argocd-repo-key` | `argocd/repo-<repo>` (deploy key。GitHub 側にも登録する) |
+
+### dev のアプリ・基盤認証: さくら Secret Manager + ESO
+
+dev では External Secrets Operator (ESO) の Webhook Provider を使う。
+現在は values の `enabled: false` で Secret の切替を保留している。
+有効化すると、さくらの
+`POST /secretmanager/vaults/{id}/secrets/unveil` を呼び、15分間隔で
+`scoreserver/discord-oauth-client` を更新する。共通 Helm chart
+`charts/sakura-secrets` が SecretStore と ExternalSecret を生成する。
+アプリ側は `manifest/base/apps/regalia/secrets/dev.yaml` に対応だけを書く。
+CSI ドライバや Pod のボリュームは不要。
+prod は既存のダミー定義のままで、この移行の対象外。
+
+```yaml
+secrets:
+  - name: discord-oauth-client
+    keys:
+      client-id: scoreserver-discord-client-id
+      client-secret: scoreserver-discord-client-secret
+```
+
+初回の準備後に `enabled: true` にする。Secret を増やす際はこの一覧へ追加する。値の変更はさくら側だけで行う。
+chart は namespace ごとに1リリースとし、同じ namespace の接続設定を共用する。
+別 namespace へ導入する場合は、そこにも認証 Secret を用意する。
+dev の `regalia` Application は workload とこの chart を複数ソースで同期する。
+
+1. KMS キーと保管庫は `terraform/secrets.tf` で dev 用に管理する。
+   ID は `terraform -chdir=terraform output -raw secret_manager_vault_id` で確認できる。
+   次の名前で実際の値を登録する。
+
+   | 保管庫内の名前 | 値 | Kubernetes Secret のキー |
+   | --- | --- | --- |
+   | `scoreserver-discord-client-id` | Discord OAuth Client ID | `client-id` |
+   | `scoreserver-discord-client-secret` | Discord OAuth Client Secret | `client-secret` |
+
+2. 対象保管庫の `unveil` 権限を持つ専用 API キーを用意する。
+   `.envrc` に `SAKURA_SECRETS_ACCESS_TOKEN`、`SAKURA_SECRETS_ACCESS_TOKEN_SECRET`、
+   `SAKURA_SECRETS_VAULT_ID` を設定して `direnv allow` する。
+   この API キーは初回投入が必要で、ESO 自身から取得する構成にはしない。
+
+3. 認証 Secret を投入し、既存ダミー Secret を Argo CD の prune から保護する。
+   **ダミーを Git の管理対象から外す変更を同期する前に実行する。**
+   投入タスクは Bash・jq・kubectl を使用し、認証情報を環境変数から標準入力で渡す。
+   秘密の値をコマンド引数や一時ファイルに書き出さない。
+
+   ```bash
+   SECRET_KUBE_CONTEXT=admin@ictsc-dev task sakura-secret-credentials
+   kubectl --context admin@ictsc-dev -n scoreserver annotate secret discord-oauth-client \
+     argocd.argoproj.io/sync-options=Prune=false --overwrite
+   ```
+
+4. Regalia の values を `enabled: true` にし、dev workload の kustomization に
+   `components: [../../components/external-secrets]` を追加してダミー定義を外す。
+   Argo CD の `external-secrets` Application を先に同期し、controller、webhook、
+   CRD が Ready になってから `regalia` を同期する。root の sync-wave だけでは、
+   子 Application の CRD 導入完了を保証しないため順番を確認する。
+   ESO は `creationPolicy: Orphan` で既存 Secret を引き継ぐ。
+   参照元の削除や API 障害時には既存の Secret を保持する。
+
+5. 同期を確認して backend を再起動する。Secret の値そのものは表示しない。
+
+   ```bash
+   kubectl --context admin@ictsc-dev -n scoreserver wait \
+     --for=condition=Ready secretstore/sakura-secret-manager --timeout=120s
+   kubectl --context admin@ictsc-dev -n scoreserver wait \
+     --for=condition=Ready externalsecret/discord-oauth-client --timeout=120s
+   kubectl --context admin@ictsc-dev -n scoreserver rollout restart deployment/scoreserver-backend
+   kubectl --context admin@ictsc-dev -n scoreserver rollout status deployment/scoreserver-backend
+   ```
+
+値を更新した際も、同期完了後に backend の再起動が必要（環境変数は自動更新されない）。
+即時同期は ExternalSecret に `force-sync` annotation を設定して要求できる。
+復旧時には、API 認証 Secret の再投入と保管庫側の値が必要。
+
+仕様: [さくら Secret Manager API](https://manual.sakura.ad.jp/cloud/appliance/secretsmanager/index.html#api)
+・[ESO Webhook Provider](https://external-secrets.io/latest/provider/webhook/)
+
+
+基盤の対応表は `manifest/envs/dev/secrets/<namespace>.yaml` にまとめる。
+各 namespace に `<namespace>-secrets` Application と SecretStore を1つずつ作る。
+
+| namespace | 移行対象の Secret |
+| --- | --- |
+| dex | `dex-secrets` |
+| oauth2-proxy | `oidc` |
+| argocd | `argocd-oidc` |
+| monitoring | `grafana-oidc`、`alertmanager-discord`、`loki-object-storage`、`tempo-object-storage` |
+
+Dex と各 OIDC クライアントは同じ保管庫内のキーを参照する。
+既存の client secret と cookie secret をコピーし、移行のための再生成はしない。
+証明書・CNPG の DB 認証・Helm のリリース情報等は各 controller の管理を継続する。
+Argo CD Deploy Key と ESO の API 認証は GitOps 起動前に必要なため初期投入を維持する。
+
+基盤 Secret の移行では、保管庫と ESO CRD を先に用意し、values を有効化する前に
+下記を実行する。インポートは共通 chart の生成結果から対応表を読み、現在の値をコピーする。
+Bash・jq・curl・Helm・kubectl を使用する。
+`SAKURACLOUD_ACCESS_TOKEN` / `SAKURACLOUD_ACCESS_TOKEN_SECRET` には保管庫の一覧・取得・書込権限、
+`SAKURA_SECRETS_*` の専用キーには ESO の読取権限を持たせる。
+
+```bash
+export SECRET_KUBE_CONTEXT=admin@ictsc-dev
+export SAKURA_SECRETS_VAULT_ID=$(terraform -chdir=terraform output -raw secret_manager_vault_id)
+for ns in dex oauth2-proxy argocd monitoring; do
+  task sakura-secret-import -- "$ns" "manifest/envs/dev/secrets/$ns.yaml"
+  SECRET_NAMESPACE="$ns" task sakura-secret-credentials
+done
+```
+
+インポートは既存の値と一致すればスキップし、異なる値が既にある場合は上書きせず停止する。
+途中で失敗してもコピー済みの項目は残るため、原因を解消して同じコマンドを再実行できる。
+別プロセスから保管庫を書き換えながらインポートしないこと。
+Discord OAuth のダミー値はインポートせず、実際の値を登録する。
+
+その後、対象 namespace の values を `enabled: true` に変更して push し、各 namespace の
+ExternalSecret がすべて Ready になることを確認する。初回は値を変えないため一斉再起動は不要。
+後日のキー更新では、Dex と対応クライアント等、環境変数を読む利用先を同期後に再起動する。
+Object Storage キーを Terraform 側で更新した場合も、保管庫側へ新しい値を反映する。
+既存の `task auth-secrets` / `alert-secrets` / `object-storage-secrets` は
+ESO への切替後は上書き投入をスキップする。
+クラスタ再構築時は初期 Secret の投入後、保管庫の値を ESO から復元してから認証系サービスを起動する。
+既存保管庫に対し新規生成値をインポートしないこと。
+
+KMS と保管庫には `prevent_destroy` を設定している。クラスタ全体の destroy 時も、
+保管庫を残すかを先に決める。Secret 値は Terraform リソースとして登録しない。
 
 ## まだやってないこと
 

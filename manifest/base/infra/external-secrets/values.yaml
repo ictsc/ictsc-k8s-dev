@@ -1,0 +1,6 @@
+installCRDs: true
+# 今回は scoreserver 内の SecretStore のみを使う。
+processClusterStore: false
+processClusterExternalSecret: false
+processPushSecret: false
+processClusterPushSecret: false

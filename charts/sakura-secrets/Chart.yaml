@@ -1,0 +1,5 @@
+apiVersion: v2
+name: sakura-secrets
+description: Sync Sakura Secret Manager values into Kubernetes Secrets with ESO
+type: application
+version: 0.1.0

@@ -20,6 +20,18 @@ vars:
   ACME_EMAIL: '{{.ACME_EMAIL | default "TODO-set-me@ictsc.net"}}'
 
 tasks:
+  sakura-secret-import:
+    desc: 既存 Secret の値をさくらへコピー (namespace と values ファイルを引数で指定)
+    silent: true
+    cmds:
+      - bash scripts/sakura-secret-import.sh {{.CLI_ARGS}}
+
+  sakura-secret-credentials:
+    desc: ESO のさくら API 認証を投入 (SECRET_NAMESPACE 既定 scoreserver / SECRET_KUBE_CONTEXT 必須)
+    silent: true
+    cmds:
+      - bash scripts/sakura-secret-credentials.sh
+
   # 共通
   check-binary:
     desc: 指定されたバイナリがインストールされているか確認
@@ -557,6 +569,8 @@ tasks:
 
   alert-secrets:
     desc: Alertmanager の通知先 (Discord webhook) を Secret にする
+    status:
+      - kubectl -n monitoring get externalsecret alertmanager-discord >/dev/null 2>&1
     cmds:
       - |
         set -eu
@@ -585,6 +599,13 @@ tasks:
     cmds:
       - |
         set -eu
+
+        # ESO への切替後は Terraform の値を上書き投入しない。
+        if kubectl -n monitoring get externalsecret loki-object-storage >/dev/null 2>&1 || \
+           kubectl -n monitoring get externalsecret tempo-object-storage >/dev/null 2>&1; then
+          echo "Object Storage Secret は ESO で管理します。キー更新時はさくらの保管庫へ反映してください。"
+          exit 0
+        fi
 
         env=$(cd terraform && terraform workspace show)
         if [ "${env}" != "dev" ]; then
@@ -667,6 +688,10 @@ tasks:
     cmds:
       - |
         set -eu
+        if kubectl -n dex get externalsecret dex-secrets >/dev/null 2>&1; then
+          echo "認証 Secret は ESO で管理します。ExternalSecret の同期状態を確認してください。"
+          exit 0
+        fi
         # 値は .envrc (direnv) から取る。聞き直さない。
         if [ -z "${GITHUB_CLIENT_ID:-}" ] || [ -z "${GITHUB_CLIENT_SECRET:-}" ]; then
           echo "GITHUB_CLIENT_ID / GITHUB_CLIENT_SECRET が設定されていません" >&2

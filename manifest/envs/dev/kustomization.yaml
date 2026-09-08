@@ -1,5 +1,7 @@
 resources:
   - ../../base
+  - ../../base/infra/external-secrets
+  - ./resources/infra-secrets.yaml
   - ./resources/cilium-lb-ip-pool.yaml
   - ./resources/cilium-l2-announcement.yaml
   - ./resources/gateway.yaml
@@ -12,6 +14,24 @@ resources:
   - ./resources/longhorn.yaml
 
 patches:
+  - target: {kind: Application, name: regalia}
+    patch: |-
+      - op: remove
+        path: /spec/source
+      - op: add
+        path: /spec/sources
+        value:
+          - repoURL: git@github.com:ictsc/ictsc-k8s-dev.git
+            targetRevision: refs/heads/main
+            path: manifest/base/apps/regalia/workload/overlays/dev
+            ref: values
+          - repoURL: git@github.com:ictsc/ictsc-k8s-dev.git
+            targetRevision: refs/heads/main
+            path: charts/sakura-secrets
+            helm:
+              releaseName: regalia-secrets
+              valueFiles:
+                - $values/manifest/base/apps/regalia/secrets/dev.yaml
   - target: {kind: Application}
     patch: |-
       - op: add

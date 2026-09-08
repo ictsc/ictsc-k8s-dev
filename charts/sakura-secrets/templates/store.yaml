@@ -1,0 +1,24 @@
+{{- if .Values.enabled }}
+apiVersion: external-secrets.io/v1
+kind: SecretStore
+metadata:
+  name: sakura-secret-manager
+  namespace: {{ .Release.Namespace }}
+spec:
+  provider:
+    webhook:
+      # 保管庫はグローバル。内側のテンプレートは ESO が展開する。
+      url: {{ `https://secure.sakura.ad.jp/cloud/zone/is1a/api/cloud/1.1/secretmanager/vaults/{{ .auth.vaultID }}/secrets/unveil` | quote }}
+      method: POST
+      timeout: 10s
+      headers:
+        Content-Type: application/json
+        Authorization: {{ `Basic {{ print .auth.token ":" .auth.secret | b64enc }}` | quote }}
+      body: {{ `{"Secret":{"Name":{{ .remoteRef.key | toJson }}}}` | quote }}
+      result:
+        jsonPath: $.Secret.Value
+      secrets:
+        - name: auth
+          secretRef:
+            name: sakura-secret-manager-credentials
+{{- end }}

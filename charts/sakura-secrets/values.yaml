@@ -1,0 +1,4 @@
+# namespace ごとに1リリースで接続設定と Secret の一覧を管理する。
+enabled: true
+refreshInterval: 15m
+secrets: []
