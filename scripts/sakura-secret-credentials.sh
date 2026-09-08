@@ -17,7 +17,7 @@ for command in jq kubectl; do
   fi
 done
 
-export SECRET_NAMESPACE="${SECRET_NAMESPACE:-scoreserver}"
+export SECRET_NAMESPACE="${SECRET_NAMESPACE:-external-secrets}"
 kubectl_args=(--context "$SECRET_KUBE_CONTEXT" -n "$SECRET_NAMESPACE")
 kubectl "${kubectl_args[@]}" get namespace "$SECRET_NAMESPACE" >/dev/null
 

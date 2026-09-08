@@ -27,7 +27,7 @@ tasks:
       - bash scripts/sakura-secret-import.sh {{.CLI_ARGS}}
 
   sakura-secret-credentials:
-    desc: ESO のさくら API 認証を投入 (SECRET_NAMESPACE 既定 scoreserver / SECRET_KUBE_CONTEXT 必須)
+    desc: ESO の共有 API 認証を external-secrets に投入 (SECRET_KUBE_CONTEXT 必須)
     silent: true
     cmds:
       - bash scripts/sakura-secret-credentials.sh

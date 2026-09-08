@@ -823,11 +823,11 @@ Secret の値は Git に置かない。基盤の認証情報はクラスタに�
 ### dev のアプリ・基盤認証: さくら Secret Manager + ESO
 
 dev では External Secrets Operator (ESO) の Webhook Provider を使う。
-現在は values の `enabled: false` で Secret の切替を保留している。
-有効化すると、さくらの
+基盤の7 Secret は有効化済み。Discord OAuth は実値の登録待ちで `enabled: false`。
+さくらの
 `POST /secretmanager/vaults/{id}/secrets/unveil` を呼び、15分間隔で
-`scoreserver/discord-oauth-client` を更新する。共通 Helm chart
-`charts/sakura-secrets` が SecretStore と ExternalSecret を生成する。
+各 Kubernetes Secret を更新する。共通 Helm chart
+`charts/sakura-secrets` が ExternalSecret を生成し、共有 ClusterSecretStore を参照する。
 アプリ側は `manifest/base/apps/regalia/secrets/dev.yaml` に対応だけを書く。
 CSI ドライバや Pod のボリュームは不要。
 prod は既存のダミー定義のままで、この移行の対象外。
@@ -841,8 +841,11 @@ secrets:
 ```
 
 初回の準備後に `enabled: true` にする。Secret を増やす際はこの一覧へ追加する。値の変更はさくら側だけで行う。
-chart は namespace ごとに1リリースとし、同じ namespace の接続設定を共用する。
-別 namespace へ導入する場合は、そこにも認証 Secret を用意する。
+認証キーは `external-secrets/sakura-secret-manager-credentials` の1か所に置く。
+`manifest/base/infra/external-secrets/resources/clustersecretstore.yaml` の
+`conditions.namespaces` で利用可能な namespace を制限する。
+別 namespace へ導入する場合はこの許可リストに追加する。認証キーの複製は不要。
+現在はユーザー承認により管理用 API キーを一時利用中。専用読取キーの発行後に同じ Secret を更新する。
 dev の `regalia` Application は workload とこの chart を複数ソースで同期する。
 
 1. KMS キーと保管庫は `terraform/secrets.tf` で dev 用に管理する。
@@ -870,7 +873,8 @@ dev の `regalia` Application は workload とこの chart を複数ソースで
      argocd.argoproj.io/sync-options=Prune=false --overwrite
    ```
 
-4. Regalia の values を `enabled: true` にし、dev workload の kustomization に
+4. ClusterSecretStore の許可リストに `scoreserver` を追加する。
+   Regalia の values を `enabled: true` にし、dev workload の kustomization に
    `components: [../../components/external-secrets]` を追加してダミー定義を外す。
    Argo CD の `external-secrets` Application を先に同期し、controller、webhook、
    CRD が Ready になってから `regalia` を同期する。root の sync-wave だけでは、
@@ -882,7 +886,7 @@ dev の `regalia` Application は workload とこの chart を複数ソースで
 
    ```bash
    kubectl --context admin@ictsc-dev -n scoreserver wait \
-     --for=condition=Ready secretstore/sakura-secret-manager --timeout=120s
+     --for=condition=Ready clustersecretstore/sakura-secret-manager --timeout=120s
    kubectl --context admin@ictsc-dev -n scoreserver wait \
      --for=condition=Ready externalsecret/discord-oauth-client --timeout=120s
    kubectl --context admin@ictsc-dev -n scoreserver rollout restart deployment/scoreserver-backend
@@ -898,7 +902,7 @@ dev の `regalia` Application は workload とこの chart を複数ソースで
 
 
 基盤の対応表は `manifest/envs/dev/secrets/<namespace>.yaml` にまとめる。
-各 namespace に `<namespace>-secrets` Application と SecretStore を1つずつ作る。
+各 namespace に `<namespace>-secrets` Application を作り、共通の ClusterSecretStore を参照する。
 
 | namespace | 移行対象の Secret |
 | --- | --- |
@@ -923,8 +927,8 @@ export SECRET_KUBE_CONTEXT=admin@ictsc-dev
 export SAKURA_SECRETS_VAULT_ID=$(terraform -chdir=terraform output -raw secret_manager_vault_id)
 for ns in dex oauth2-proxy argocd monitoring; do
   task sakura-secret-import -- "$ns" "manifest/envs/dev/secrets/$ns.yaml"
-  SECRET_NAMESPACE="$ns" task sakura-secret-credentials
 done
+task sakura-secret-credentials
 ```
 
 インポートは既存の値と一致すればスキップし、異なる値が既にある場合は上書きせず停止する。

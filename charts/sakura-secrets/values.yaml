@@ -1,4 +1,4 @@
-# namespace ごとに1リリースで接続設定と Secret の一覧を管理する。
+# namespace ごとに Secret の一覧を管理する。接続先は共有 ClusterSecretStore。
 enabled: true
 refreshInterval: 15m
 secrets: []
