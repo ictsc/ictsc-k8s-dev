@@ -1,0 +1,6 @@
+issuers:
+  - issuer: https://dex.k8s-dev.ictsc.net
+    client_id: oauth2-proxy
+    username_key: sub
+    group_keys:
+      - groups

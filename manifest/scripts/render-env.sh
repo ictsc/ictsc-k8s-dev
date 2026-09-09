@@ -175,6 +175,14 @@ extraArgs:
   trusted-proxy-ip: ${pod_subnet}
 EOF
 
+if [[ "${env}" == "dev" ]]; then
+  cat >> "${d}/values/oauth2-proxy.yaml" <<EOF
+  # Regalia 管理 API が Dex ID token と運営チームを検証する。
+  scope: "openid profile email groups"
+  set-authorization-header: "true"
+EOF
+fi
+
 cat > "${d}/values/dex.yaml" <<EOF
 ${gen}
 config:

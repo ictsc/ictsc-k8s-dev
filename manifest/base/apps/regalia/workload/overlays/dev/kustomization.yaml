@@ -6,6 +6,13 @@ components:
 
 namespace: scoreserver
 
+configMapGenerator:
+  - name: scoreserver-backend-config
+    behavior: merge
+    files:
+      - admin-auth-config.yaml
+      - admin-auth-policy.csv
+
 images:
   - name: backend
     newName: ghcr.io/ictsc/ictsc-regalia/backend
@@ -25,3 +32,12 @@ patches:
       version: v1
       kind: HTTPRoute
     path: external-auth-patch.yaml
+  - target:
+      group: gateway.networking.k8s.io
+      version: v1
+      kind: HTTPRoute
+      name: scoreserver-admin
+    patch: |-
+      - op: add
+        path: /spec/rules/1/filters/0/externalAuth/http/allowedResponseHeaders/-
+        value: Authorization

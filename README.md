@@ -371,6 +371,19 @@ v1.2.3 tag -> prod へ v1.2.3
 
 Image UpdaterはArgo CDに登録済みのこのリポジトリのSSH認証情報を再利用する。
 
+dev の Regalia 管理 API は Dex の GitHub ログインを利用する。
+`https://admin-contest.k8s-dev.ictsc.net` でログインし、GitHub チーム
+`ictsc:ictsc2026` の所属者だけに `role:admin` を付与する。
+oauth2-proxy の ID token を Gateway が管理 API のみに渡し、backend が
+issuer・audience・署名・有効期限と groups を検証する。設定は dev overlay の
+`admin-auth-config.yaml` / `admin-auth-policy.csv` に置く。
+groups scope 追加前のセッションでは、いったんログアウトして再ログインする。
+
+参加者用の Discord ログイン・招待コードと運営権限は別物。
+最初のチームは管理 API `/api/admin.v1.TeamService/CreateTeam` で作成し、
+`/api/admin.v1.InvitationService/CreateInvitationCode` にチーム番号と有効期限を
+渡して招待コードを発行する（code を省略すると自動生成）。
+
 > [!WARNING]
 > **`terraform apply` がサーバ作成中にタイムアウトや 409 で落ちたら、孤児サーバを疑うこと。**
 > ゾーンが混んでいるとサーバ作成に数十分かかることがあり、さくら側では作成が完了して

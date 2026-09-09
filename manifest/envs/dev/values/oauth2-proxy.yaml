@@ -6,3 +6,6 @@ extraArgs:
   whitelist-domain: .k8s-dev.ictsc.net
   # X-Forwarded-* を信用する送信元を Gateway の Pod CIDR に限定する。
   trusted-proxy-ip: 10.244.0.0/16
+  # Regalia 管理 API が Dex ID token と運営チームを検証する。
+  scope: "openid profile email groups"
+  set-authorization-header: "true"
