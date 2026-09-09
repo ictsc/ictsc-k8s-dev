@@ -823,7 +823,7 @@ Secret の値は Git に置かない。基盤の認証情報はクラスタに�
 ### dev のアプリ・基盤認証: さくら Secret Manager + ESO
 
 dev では External Secrets Operator (ESO) の Webhook Provider を使う。
-基盤の7 Secret は有効化済み。Discord OAuth は実値の登録待ちで `enabled: false`。
+基盤の7 Secret と Regalia の Discord OAuth を有効化済み。
 さくらの
 `POST /secretmanager/vaults/{id}/secrets/unveil` を呼び、15分間隔で
 各 Kubernetes Secret を更新する。共通 Helm chart
@@ -856,6 +856,9 @@ dev の `regalia` Application は workload とこの chart を複数ソースで
    | --- | --- | --- |
    | `scoreserver-discord-client-id` | Discord OAuth Client ID | `client-id` |
    | `scoreserver-discord-client-secret` | Discord OAuth Client Secret | `client-secret` |
+
+   Discord Developer Portal の OAuth2 Redirects は
+   `https://contest.k8s-dev.ictsc.net/api/auth/callback` を登録する。
 
 2. 対象保管庫の `unveil` 権限を持つ専用 API キーを用意する。
    `.envrc` に `SAKURA_SECRETS_ACCESS_TOKEN`、`SAKURA_SECRETS_ACCESS_TOKEN_SECRET`、
