@@ -59,9 +59,9 @@ spec:
         - name: ICTSC_DISCORD_ADMIN_REDIRECT_URI
           value: https://admin-contest.k8s-dev.ictsc.net/api/v1/admin/auth/discord/callback
         - name: ICTSC_DISCORD_ADMIN_GUILD_ID
-          value: preview
+          value: "900000000000000010"
         - name: ICTSC_DISCORD_ADMIN_ROLE_IDS
-          value: preview-admin
+          value: "900000000000000011"
         ports:
         - name: http
           containerPort: 8080
