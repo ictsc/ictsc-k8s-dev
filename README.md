@@ -371,18 +371,23 @@ v1.2.3 tag -> prod へ v1.2.3
 
 Image UpdaterはArgo CDに登録済みのこのリポジトリのSSH認証情報を再利用する。
 
-dev の Regalia 管理 API は Dex の GitHub ログインを利用する。
-`https://admin-contest.k8s-dev.ictsc.net` でログインし、GitHub チーム
-`ictsc:ictsc2026` の所属者だけに `role:admin` を付与する。
-oauth2-proxy の ID token を Gateway が管理 API のみに渡し、backend が
-issuer・audience・署名・有効期限と groups を検証する。設定は dev overlay の
-`admin-auth-config.yaml` / `admin-auth-policy.csv` に置く。
-groups scope 追加前のセッションでは、いったんログアウトして再ログインする。
+dev は `codex/openapi-contract-rebuild` の OpenAPI 版を試験配置している。
+設定は `manifest/base/apps/regalia/workload/overlays/openapi-dev`。イメージを
+コミットの SHA タグで固定し、試験中は dev の ImageUpdater を無効化する。
 
-参加者用の Discord ログイン・招待コードと運営権限は別物。
-最初のチームは管理 API `/api/admin.v1.TeamService/CreateTeam` で作成し、
-`/api/admin.v1.InvitationService/CreateInvitationCode` にチーム番号と有効期限を
-渡して招待コードを発行する（code を省略すると自動生成）。
+- 参加者: https://contest.k8s-dev.ictsc.net/
+- 管理画面: https://admin-contest.k8s-dev.ictsc.net/admin/
+- 両サイトとも専用 oauth2-proxy が Dex の `ictsc:ictsc2026` グループを要求する。
+  セッションCookieは `_regalia_preview` で、他の基盤アプリと分離する。
+- `ICTSC_DEV_FAKE_MODE=true`。Discord ログイン操作では共有の仮ユーザー
+  `preview-admin` / `preview-contestant` でログインする。外部Discord認証、
+  GitHubコンテンツ同期、SState操作は無効。公開範囲を拡大しないこと。
+- 新DBは `ictscore_openapi`、Redis DBは1。旧DB `ictscore` とRedis DB0は保持する。
+  旧参加者・招待コードは新版に移行しない。
+- CNPG Databaseリソースで新DBを管理（削除時 retain）。PreSync Job が初期schemaと
+  team color列を適用する。SQLはブランチの `backend/db/migrations` から取得したもの。
+- 旧版に戻す場合は Argo CD source を `workload/overlays/dev` に戻す。
+  新DBに旧版マイグレーションを適用しない。
 
 > [!WARNING]
 > **`terraform apply` がサーバ作成中にタイムアウトや 409 で落ちたら、孤児サーバを疑うこと。**

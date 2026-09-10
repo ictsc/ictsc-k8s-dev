@@ -2,6 +2,8 @@ resources:
   - ../../base
   - ../../base/infra/external-secrets
   - ./resources/infra-secrets.yaml
+  - ./resources/regalia-auth.yaml
+  - ./resources/regalia-openapi-database.yaml
   - ./resources/cilium-lb-ip-pool.yaml
   - ./resources/cilium-l2-announcement.yaml
   - ./resources/gateway.yaml
@@ -14,6 +16,14 @@ resources:
   - ./resources/longhorn.yaml
 
 patches:
+  # Preview branch is pinned explicitly; do not follow main images.
+  - patch: |-
+      $patch: delete
+      apiVersion: argocd-image-updater.argoproj.io/v1alpha1
+      kind: ImageUpdater
+      metadata:
+        name: regalia
+        namespace: argocd
   - target: {kind: Application, name: regalia}
     patch: |-
       - op: remove
@@ -23,7 +33,7 @@ patches:
         value:
           - repoURL: git@github.com:ictsc/ictsc-k8s-dev.git
             targetRevision: refs/heads/main
-            path: manifest/base/apps/regalia/workload/overlays/dev
+            path: manifest/base/apps/regalia/workload/overlays/openapi-dev
             ref: values
           - repoURL: git@github.com:ictsc/ictsc-k8s-dev.git
             targetRevision: refs/heads/main

@@ -1,0 +1,73 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: scoreserver-openapi-migrate
+  annotations:
+    argocd.argoproj.io/hook: PreSync
+    argocd.argoproj.io/hook-delete-policy: BeforeHookCreation,HookSucceeded
+spec:
+  backoffLimit: 3
+  activeDeadlineSeconds: 600
+  template:
+    spec:
+      restartPolicy: Never
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65532
+        runAsGroup: 65532
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+      - name: migrate
+        image: postgres:16
+        imagePullPolicy: IfNotPresent
+        command:
+        - /bin/sh
+        - -ec
+        env:
+        - name: PGHOST
+          valueFrom:
+            secretKeyRef:
+              name: postgres-app
+              key: host
+        - name: PGDATABASE
+          value: ictscore_openapi
+        - name: PGUSER
+          valueFrom:
+            secretKeyRef:
+              name: postgres-app
+              key: username
+        - name: PGPASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: postgres-app
+              key: password
+        resources:
+          requests:
+            cpu: 25m
+            memory: 128Mi
+          limits:
+            cpu: 500m
+            memory: 1Gi
+        securityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          capabilities:
+            drop:
+            - ALL
+        args:
+        - "if [ \"$(psql -XAtqc \"SELECT to_regclass('public.teams') IS NOT NULL\"\
+          )\" = f ]; then\n  psql -X -v ON_ERROR_STOP=1 -f /migrations/0001_init.sql\n\
+          fi\nif [ \"$(psql -XAtqc \"SELECT EXISTS (SELECT FROM information_schema.columns\
+          \ WHERE table_schema='public' AND table_name='teams' AND column_name='color')\"\
+          )\" = f ]; then\n  psql -X -v ON_ERROR_STOP=1 -f /migrations/0002_team_color.sql\n\
+          fi\n"
+        volumeMounts:
+        - name: migrations
+          mountPath: /migrations
+          readOnly: true
+      volumes:
+      - name: migrations
+        configMap:
+          name: scoreserver-openapi-migrations

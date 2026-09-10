@@ -1,0 +1,25 @@
+resources:
+- backend.yaml
+- frontend.yaml
+- route-contestant.yaml
+- route-admin.yaml
+- migrate.yaml
+namespace: scoreserver
+images:
+- name: backend
+  newName: ghcr.io/ictsc/ictsc-regalia/backend
+  digest: sha256:e94c9aff7060f85e740ecc2881063a52e63b586566c4f4430d3c4fccf60c975c
+  newTag: sha-6a4488d
+- name: frontend
+  newName: ghcr.io/ictsc/ictsc-regalia/frontend
+  digest: sha256:949f514700c7f29540c08583b7b179d20651fbddb5135e46fcb0c195d2ef3f19
+  newTag: sha-6a4488d
+configMapGenerator:
+- name: scoreserver-openapi-migrations
+  files:
+  - 0001_init.sql
+  - 0002_team_color.sql
+  options:
+    annotations:
+      argocd.argoproj.io/hook: PreSync
+      argocd.argoproj.io/sync-wave: '-2'
