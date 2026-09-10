@@ -373,7 +373,7 @@ Image UpdaterはArgo CDに登録済みのこのリポジトリのSSH認証情報
 
 dev は `codex/openapi-contract-rebuild` の OpenAPI 版を試験配置している。
 設定は `manifest/base/apps/regalia/workload/overlays/openapi-dev`。イメージを
-`preview-openapi-20260910-4` タグのdigestで固定し、試験中は dev の ImageUpdater を無効化する。
+`preview-openapi-20260910-5` タグのdigestで固定し、試験中は dev の ImageUpdater を無効化する。
 
 - 参加者: https://contest.k8s-dev.ictsc.net/
 - 管理画面: https://contest.k8s-dev.ictsc.net/admin/ （旧 admin-contest ホストから転送）
@@ -381,7 +381,8 @@ dev は `codex/openapi-contract-rebuild` の OpenAPI 版を試験配置してい
   セッションCookieは `_regalia_preview` で、他の基盤アプリと分離する。
 - Discord認証は実接続。参加者は `ICTSC2026 予選` ギルドと対応チームロールを要求し、
   招待コード入力を省略する。管理者は同ギルドの `ICTSC2026 Staff` ロールを要求する。
-  Staffが参加者側からログインした場合も、管理画面へ自動で移動する。
+  参加者側ではチームロールを優先し、Staffのみの場合は管理画面へ自動で移動する。
+  管理者専用入口ではStaffロールで認証する。代理ログインは参加者セッションの確認後に移動する。
 - `ICTSC_DEV_FAKE_MODE=true` はGitHubコンテンツ同期・SStateを無効にするため維持する。
   Discord資格情報はESOの `discord-oauth-client` Secretから参照する。
 - 新DBは `ictscore_openapi`、Redis DBは2。仮認証セッションのDB1と旧版のDB0は使用しない。
