@@ -373,7 +373,7 @@ Image UpdaterはArgo CDに登録済みのこのリポジトリのSSH認証情報
 
 dev は `codex/openapi-contract-rebuild` の OpenAPI 版を試験配置している。
 設定は `manifest/base/apps/regalia/workload/overlays/openapi-dev`。イメージを
-`preview-openapi-20260910-5` タグのdigestで固定し、試験中は dev の ImageUpdater を無効化する。
+`preview-openapi-20260910-7` タグのdigestで固定し、試験中は dev の ImageUpdater を無効化する。
 
 - 参加者: https://contest.k8s-dev.ictsc.net/
 - 管理画面: https://contest.k8s-dev.ictsc.net/admin/ （旧 admin-contest ホストから転送）
@@ -393,6 +393,8 @@ dev は `codex/openapi-contract-rebuild` の OpenAPI 版を試験配置してい
   差分をコミットする。チーム本体は管理APIに保存し、初回登録には
   `python3 scripts/regalia/import-teams.py` を使用する。既存データの不一致は上書きせず停止する。
   通常の編集・メンバー確認は `/admin/teams` を使用する。
+- 参加者Cookieは `regalia-user-session` を使用する。旧 `user-session` の `/api` スコープは
+  ログイン・代理ログイン時に削除し、同名CookieのPath競合を解消する。
 - CNPG Databaseリソースで新DBを管理（削除時 retain）。PreSync Job が初期schemaと
   team color列を適用する。SQLはブランチの `backend/db/migrations` から取得したもの。
 - 旧版に戻す場合は Argo CD source を `workload/overlays/dev` に戻す。
