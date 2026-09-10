@@ -28,6 +28,97 @@ spec:
   - matches:
     - path:
         type: PathPrefix
+        value: /submissions
+    filters:
+    - type: RequestRedirect
+      requestRedirect:
+        hostname: contest.k8s-dev.ictsc.net
+        scheme: https
+        statusCode: 302
+        path:
+          type: ReplacePrefixMatch
+          replacePrefixMatch: /admin/submissions
+  - matches:
+    - path:
+        type: PathPrefix
+        value: /teams
+    filters:
+    - type: RequestRedirect
+      requestRedirect:
+        hostname: contest.k8s-dev.ictsc.net
+        scheme: https
+        statusCode: 302
+        path:
+          type: ReplacePrefixMatch
+          replacePrefixMatch: /admin/teams
+  - matches:
+    - path:
+        type: PathPrefix
+        value: /contestants
+    filters:
+    - type: RequestRedirect
+      requestRedirect:
+        hostname: contest.k8s-dev.ictsc.net
+        scheme: https
+        statusCode: 302
+        path:
+          type: ReplacePrefixMatch
+          replacePrefixMatch: /admin/contestants
+  - matches:
+    - path:
+        type: PathPrefix
+        value: /scores
+    filters:
+    - type: RequestRedirect
+      requestRedirect:
+        hostname: contest.k8s-dev.ictsc.net
+        scheme: https
+        statusCode: 302
+        path:
+          type: ReplacePrefixMatch
+          replacePrefixMatch: /admin/scores
+  - matches:
+    - path:
+        type: PathPrefix
+        value: /deployments
+    filters:
+    - type: RequestRedirect
+      requestRedirect:
+        hostname: contest.k8s-dev.ictsc.net
+        scheme: https
+        statusCode: 302
+        path:
+          type: ReplacePrefixMatch
+          replacePrefixMatch: /admin/deployments
+  - matches:
+    - path:
+        type: PathPrefix
+        value: /settings
+    filters:
+    - type: RequestRedirect
+      requestRedirect:
+        hostname: contest.k8s-dev.ictsc.net
+        scheme: https
+        statusCode: 302
+        path:
+          type: ReplacePrefixMatch
+          replacePrefixMatch: /admin/settings
+  - matches:
+    - path:
+        type: PathPrefix
+        value: /content
+    filters:
+    - type: RequestRedirect
+      requestRedirect:
+        hostname: contest.k8s-dev.ictsc.net
+        scheme: https
+        statusCode: 302
+        path:
+          type: ReplacePrefixMatch
+          replacePrefixMatch: /admin/content
+  - matches:
+    - path:
+        type: PathPrefix
         value: /
     filters:
     - type: RequestRedirect
