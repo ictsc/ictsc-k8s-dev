@@ -1,0 +1,49 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: regalia-auth
+  namespace: argocd
+spec:
+  project: default
+  sources:
+  - repoURL: https://oauth2-proxy.github.io/manifests
+    chart: oauth2-proxy
+    targetRevision: 10.7.0
+    helm:
+      releaseName: regalia-auth
+      valueFiles:
+      - $values/manifest/base/infra/oauth2-proxy/values.yaml
+      - $values/manifest/envs/dev/values/oauth2-proxy.yaml
+      valuesObject:
+        fullnameOverride: regalia-auth
+        extraArgs:
+          allowed-group: ictsc:ictsc2026
+          cookie-name: _regalia_preview
+          set-authorization-header: 'false'
+  - repoURL: git@github.com:ictsc/ictsc-k8s-dev.git
+    targetRevision: main
+    ref: values
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: oauth2-proxy
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+    - ServerSideApply=true
+---
+apiVersion: gateway.networking.k8s.io/v1beta1
+kind: ReferenceGrant
+metadata:
+  name: regalia-preview-auth
+  namespace: oauth2-proxy
+spec:
+  from:
+  - group: gateway.networking.k8s.io
+    kind: HTTPRoute
+    namespace: scoreserver
+  to:
+  - group: ''
+    kind: Service
+    name: regalia-auth
