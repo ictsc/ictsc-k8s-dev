@@ -7,6 +7,8 @@ spec:
   - name: external
     namespace: gateway
     sectionName: https
+    group: gateway.networking.k8s.io
+    kind: Gateway
   hostnames:
   - admin-contest.k8s-dev.ictsc.net
   rules:
@@ -18,6 +20,9 @@ spec:
     - name: regalia-auth
       port: 80
       namespace: oauth2-proxy
+      group: ''
+      kind: Service
+      weight: 1
   - matches:
     - path:
         type: PathPrefix
@@ -25,6 +30,9 @@ spec:
     backendRefs:
     - name: scoreserver-backend
       port: 8080
+      group: ''
+      kind: Service
+      weight: 1
     filters:
     - &id001
       type: ExternalAuth
@@ -63,5 +71,8 @@ spec:
     backendRefs:
     - name: scoreserver-frontend
       port: 8080
+      group: ''
+      kind: Service
+      weight: 1
     filters:
     - *id001
