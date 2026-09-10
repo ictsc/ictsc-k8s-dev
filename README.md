@@ -373,10 +373,10 @@ Image UpdaterはArgo CDに登録済みのこのリポジトリのSSH認証情報
 
 dev は `codex/openapi-contract-rebuild` の OpenAPI 版を試験配置している。
 設定は `manifest/base/apps/regalia/workload/overlays/openapi-dev`。イメージを
-`preview-openapi-20260910-1` タグのdigestで固定し、試験中は dev の ImageUpdater を無効化する。
+`preview-openapi-20260910-2` タグのdigestで固定し、試験中は dev の ImageUpdater を無効化する。
 
 - 参加者: https://contest.k8s-dev.ictsc.net/
-- 管理画面: https://admin-contest.k8s-dev.ictsc.net/admin/
+- 管理画面: https://contest.k8s-dev.ictsc.net/admin/ （旧 admin-contest ホストから転送）
 - 両サイトとも専用 oauth2-proxy が Dex の `ictsc:ictsc2026` グループを要求する。
   セッションCookieは `_regalia_preview` で、他の基盤アプリと分離する。
 - `ICTSC_DEV_FAKE_MODE=true`。Discord ログイン操作では共有の仮ユーザー
