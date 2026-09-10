@@ -55,7 +55,7 @@ spec:
         - name: ICTSC_ALLOWED_ORIGINS
           value: https://contest.k8s-dev.ictsc.net,https://admin-contest.k8s-dev.ictsc.net
         - name: ICTSC_DISCORD_CONTESTANT_REDIRECT_URI
-          value: https://contest.k8s-dev.ictsc.net/api/v1/contestant/auth/discord/callback
+          value: https://contest.k8s-dev.ictsc.net/api/v1/auth/discord/callback
         - name: ICTSC_DISCORD_ADMIN_REDIRECT_URI
           value: https://admin-contest.k8s-dev.ictsc.net/api/v1/admin/auth/discord/callback
         - name: ICTSC_DISCORD_ADMIN_GUILD_ID
