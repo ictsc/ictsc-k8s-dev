@@ -1,0 +1,344 @@
+# Discordのロール名で照合済み。IDは文字列。変更後は設定生成と管理API登録を実施。
+guild:
+  name: ICTSC2026 予選
+  id: '1543123371695411240'
+admin_role:
+  name: ICTSC2026 Staff
+  id: '1547264644832563280'
+teams:
+- name: よくわからんが直った
+  discord_role:
+    name: よくわからんが直った
+    id: '1547264645960695871'
+  code: 2
+  organization: ICTSC2026 予選
+  member_limit: 10
+- name: ecc.net
+  discord_role:
+    name: ecc.net
+    id: '1547264647902658702'
+  code: 3
+  organization: ICTSC2026 予選
+  member_limit: 10
+- name: SIGINT
+  discord_role:
+    name: SIGINT
+    id: '1547264650117386390'
+  code: 4
+  organization: ICTSC2026 予選
+  member_limit: 10
+- name: にんにくチューブ
+  discord_role:
+    name: にんにくチューブ
+    id: '1547264651392196728'
+  code: 5
+  organization: ICTSC2026 予選
+  member_limit: 10
+- name: LEFTOA
+  discord_role:
+    name: LEFTOA
+    id: '1547264652784828536'
+  code: 6
+  organization: ICTSC2026 予選
+  member_limit: 10
+- name: ADSL
+  discord_role:
+    name: ADSL
+    id: '1547264665363423243'
+  code: 7
+  organization: ICTSC2026 予選
+  member_limit: 10
+- name: MICON
+  discord_role:
+    name: MICON
+    id: '1547264666638483516'
+  code: 8
+  organization: ICTSC2026 予選
+  member_limit: 10
+- name: ふるこみっと２
+  discord_role:
+    name: ふるこみっと２
+    id: '1547264667884322866'
+  code: 9
+  organization: ICTSC2026 予選
+  member_limit: 10
+- name: KogCoder
+  discord_role:
+    name: KogCoder
+    id: '1547264669788672122'
+  code: 10
+  organization: ICTSC2026 予選
+  member_limit: 10
+- name: chatナスカ
+  discord_role:
+    name: chatナスカ
+    id: '1547264671873245314'
+  code: 11
+  organization: ICTSC2026 予選
+  member_limit: 10
+- name: 大久保天才Broドキャスト
+  discord_role:
+    name: 大久保天才Broドキャスト
+    id: '1547264673228001370'
+  code: 12
+  organization: ICTSC2026 予選
+  member_limit: 10
+- name: ccuser
+  discord_role:
+    name: ccuser
+    id: '1547264674519851148'
+  code: 13
+  organization: ICTSC2026 予選
+  member_limit: 10
+- name: さめかまぼこ！？
+  discord_role:
+    name: さめかまぼこ！？
+    id: '1547264675861766174'
+  code: 14
+  organization: ICTSC2026 予選
+  member_limit: 10
+- name: 後悔はsudo実行のあとで
+  discord_role:
+    name: 後悔はsudo実行のあとで
+    id: '1547264676839034971'
+  code: 15
+  organization: ICTSC2026 予選
+  member_limit: 10
+- name: 本質
+  discord_role:
+    name: 本質
+    id: '1547264678495912077'
+  code: 16
+  organization: ICTSC2026 予選
+  member_limit: 10
+- name: Convivial_net_A
+  discord_role:
+    name: Convivial_net_A
+    id: '1547264680249139211'
+  code: 17
+  organization: ICTSC2026 予選
+  member_limit: 10
+- name: convivial_net_B
+  discord_role:
+    name: convivial_net_B
+    id: '1547264681876521050'
+  code: 18
+  organization: ICTSC2026 予選
+  member_limit: 10
+- name: Hello world
+  discord_role:
+    name: Hello world
+    id: '1547264683537338368'
+  code: 19
+  organization: ICTSC2026 予選
+  member_limit: 10
+- name: 結束baud
+  discord_role:
+    name: 結束baud
+    id: '1547264684896296981'
+  code: 20
+  organization: ICTSC2026 予選
+  member_limit: 10
+- name: 302 Found
+  discord_role:
+    name: 302 Found
+    id: '1547264687794552925'
+  code: 21
+  organization: ICTSC2026 予選
+  member_limit: 10
+- name: 金魚鹿
+  discord_role:
+    name: 金魚鹿
+    id: '1547264689413689525'
+  code: 22
+  organization: ICTSC2026 予選
+  member_limit: 10
+- name: team-rat-1
+  discord_role:
+    name: team-rat-1
+    id: '1547264691573755975'
+  code: 23
+  organization: ICTSC2026 予選
+  member_limit: 10
+- name: 季節畑
+  discord_role:
+    name: 季節畑
+    id: '1547264692781711563'
+  code: 24
+  organization: ICTSC2026 予選
+  member_limit: 10
+- name: じしゃく
+  discord_role:
+    name: じしゃく
+    id: '1547264693843005500'
+  code: 25
+  organization: ICTSC2026 予選
+  member_limit: 10
+- name: 味処まるたか
+  discord_role:
+    name: 味処まるたか
+    id: '1547264695554150420'
+  code: 26
+  organization: ICTSC2026 予選
+  member_limit: 10
+- name: ':zipper_mouth:'
+  discord_role:
+    name: ':zipper_mouth:'
+    id: '1547264698024595546'
+  code: 27
+  organization: ICTSC2026 予選
+  member_limit: 10
+- name: REMIX
+  discord_role:
+    name: REMIX
+    id: '1547264701325385738'
+  code: 28
+  organization: ICTSC2026 予選
+  member_limit: 10
+- name: team-rat-2
+  discord_role:
+    name: team-rat-2
+    id: '1547264702969684059'
+  code: 29
+  organization: ICTSC2026 予選
+  member_limit: 10
+- name: 大口銀行口座の方がかなりすごくね？
+  discord_role:
+    name: 大口銀行口座の方がかなりすごくね？
+    id: '1547264704538345592'
+  code: 30
+  organization: ICTSC2026 予選
+  member_limit: 10
+- name: あと58分で京都駅に着くよ
+  discord_role:
+    name: あと58分で京都駅に着くよ
+    id: '1547264706035589282'
+  code: 31
+  organization: ICTSC2026 予選
+  member_limit: 10
+- name: 破壊王ブレイキング4
+  discord_role:
+    name: 破壊王ブレイキング4
+    id: '1547264707759571084'
+  code: 32
+  organization: ICTSC2026 予選
+  member_limit: 10
+- name: いいくるめ高専
+  discord_role:
+    name: いいくるめ高専
+    id: '1547264708925595732'
+  code: 33
+  organization: ICTSC2026 予選
+  member_limit: 10
+- name: こんぶ
+  discord_role:
+    name: こんぶ
+    id: '1547264710838190291'
+  code: 34
+  organization: ICTSC2026 予選
+  member_limit: 10
+- name: P01TERGEIST
+  discord_role:
+    name: P01TERGEIST
+    id: '1547264712046026963'
+  code: 35
+  organization: ICTSC2026 予選
+  member_limit: 10
+- name: なんでもいいよ
+  discord_role:
+    name: なんでもいいよ
+    id: '1547264713233145988'
+  code: 36
+  organization: ICTSC2026 予選
+  member_limit: 10
+- name: ｲ左ｶﾛ貝大\ (^o^) /
+  discord_role:
+    name: ｲ左ｶﾛ貝大\ (^o^) /
+    id: '1547264714663268435'
+  code: 37
+  organization: ICTSC2026 予選
+  member_limit: 10
+- name: r13s
+  discord_role:
+    name: r13s
+    id: '1547264715816960072'
+  code: 38
+  organization: ICTSC2026 予選
+  member_limit: 10
+- name: たかやま鯖審議会
+  discord_role:
+    name: たかやま鯖審議会
+    id: '1547264717431505006'
+  code: 39
+  organization: ICTSC2026 予選
+  member_limit: 10
+- name: Layer8.0.1
+  discord_role:
+    name: Layer8.0.1
+    id: '1547264718585077871'
+  code: 40
+  organization: ICTSC2026 予選
+  member_limit: 10
+- name: 大学会館前(仮)
+  discord_role:
+    name: 大学会館前(仮)
+    id: '1547264720879489135'
+  code: 41
+  organization: ICTSC2026 予選
+  member_limit: 10
+- name: traPPing...
+  discord_role:
+    name: traPPing...
+    id: '1547264722099900507'
+  code: 42
+  organization: ICTSC2026 予選
+  member_limit: 10
+- name: こけハウス
+  discord_role:
+    name: こけハウス
+    id: '1547264723597267085'
+  code: 43
+  organization: ICTSC2026 予選
+  member_limit: 10
+- name: 千葉工大で、何を始めるつもりなのか。
+  discord_role:
+    name: 千葉工大で、何を始めるつもりなのか。
+    id: '1547264724654358621'
+  code: 44
+  organization: ICTSC2026 予選
+  member_limit: 10
+- name: AI Sloper Pro MAX
+  discord_role:
+    name: AI Sloper Pro MAX
+    id: '1547264726394867722'
+  code: 45
+  organization: ICTSC2026 予選
+  member_limit: 10
+- name: 猫は神
+  discord_role:
+    name: 猫は神
+    id: '1547264727619739700'
+  code: 46
+  organization: ICTSC2026 予選
+  member_limit: 10
+- name: 第三エリア前
+  discord_role:
+    name: 第三エリア前
+    id: '1547264729087615207'
+  code: 47
+  organization: ICTSC2026 予選
+  member_limit: 10
+- name: ITRC
+  discord_role:
+    name: ITRC
+    id: '1547264730366738537'
+  code: 48
+  organization: ICTSC2026 予選
+  member_limit: 10
+- name: ノンフィクション
+  discord_role:
+    name: ノンフィクション
+    id: '1547264731830558861'
+  code: 49
+  organization: ICTSC2026 予選
+  member_limit: 10
