@@ -47,7 +47,7 @@ spec:
         - name: ICTSC_DATABASE_URL
           value: postgresql://postgres-rw:5432/ictscore_openapi?sslmode=require
         - name: ICTSC_REDIS_URL
-          value: redis://valkey-proxy:6379/1
+          value: redis://valkey-proxy:6379/2
         - name: ICTSC_DEV_FAKE_MODE
           value: 'true'
         - name: ICTSC_SECURE_COOKIES
@@ -58,10 +58,16 @@ spec:
           value: https://contest.k8s-dev.ictsc.net/api/v1/auth/discord/callback
         - name: ICTSC_DISCORD_ADMIN_REDIRECT_URI
           value: https://contest.k8s-dev.ictsc.net/api/v1/admin/auth/discord/callback
-        - name: ICTSC_DISCORD_ADMIN_GUILD_ID
-          value: "900000000000000010"
-        - name: ICTSC_DISCORD_ADMIN_ROLE_IDS
-          value: "900000000000000011"
+        - name: ICTSC_DISCORD_CLIENT_ID
+          valueFrom:
+            secretKeyRef:
+              name: discord-oauth-client
+              key: client-id
+        - name: ICTSC_DISCORD_CLIENT_SECRET
+          valueFrom:
+            secretKeyRef:
+              name: discord-oauth-client
+              key: client-secret
         ports:
         - name: http
           containerPort: 8080
@@ -86,6 +92,9 @@ spec:
           capabilities:
             drop:
             - ALL
+        envFrom:
+        - configMapRef:
+            name: scoreserver-discord-teams
 ---
 apiVersion: v1
 kind: Service

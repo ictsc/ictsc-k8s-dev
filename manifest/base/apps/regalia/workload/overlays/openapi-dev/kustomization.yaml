@@ -8,12 +8,12 @@ namespace: scoreserver
 images:
 - name: backend
   newName: ghcr.io/ictsc/ictsc-regalia/backend
-  digest: sha256:e1115066959d25389a9e1e00c4f81315076fa5d64a4af7ad4cc65cf59a2d0f78
-  newTag: preview-openapi-20260910-2
+  digest: sha256:15fbf794d13b82d218c8a4b411c814b0f4baea1004901cb456f01b067b8448af
+  newTag: preview-openapi-20260910-3
 - name: frontend
   newName: ghcr.io/ictsc/ictsc-regalia/frontend
-  digest: sha256:961178c1ba4ce06e9b63309bebd059cee15a414f0e135f202d8dddacfa68322f
-  newTag: preview-openapi-20260910-2
+  digest: sha256:704511856f56b9716042913f9a19926233859697d7bb67d6578a2724c4ddbe7d
+  newTag: preview-openapi-20260910-3
 configMapGenerator:
 - name: scoreserver-openapi-migrations
   files:
@@ -23,3 +23,6 @@ configMapGenerator:
     annotations:
       argocd.argoproj.io/hook: PreSync
       argocd.argoproj.io/sync-wave: '-2'
+- name: scoreserver-discord-teams
+  envs:
+  - discord.env

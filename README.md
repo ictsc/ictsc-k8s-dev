@@ -373,17 +373,24 @@ Image UpdaterはArgo CDに登録済みのこのリポジトリのSSH認証情報
 
 dev は `codex/openapi-contract-rebuild` の OpenAPI 版を試験配置している。
 設定は `manifest/base/apps/regalia/workload/overlays/openapi-dev`。イメージを
-`preview-openapi-20260910-2` タグのdigestで固定し、試験中は dev の ImageUpdater を無効化する。
+`preview-openapi-20260910-3` タグのdigestで固定し、試験中は dev の ImageUpdater を無効化する。
 
 - 参加者: https://contest.k8s-dev.ictsc.net/
 - 管理画面: https://contest.k8s-dev.ictsc.net/admin/ （旧 admin-contest ホストから転送）
 - 両サイトとも専用 oauth2-proxy が Dex の `ictsc:ictsc2026` グループを要求する。
   セッションCookieは `_regalia_preview` で、他の基盤アプリと分離する。
-- `ICTSC_DEV_FAKE_MODE=true`。Discord ログイン操作では共有の仮ユーザー
-  `preview-admin` / `preview-contestant` でログインする。外部Discord認証、
-  GitHubコンテンツ同期、SState操作は無効。公開範囲を拡大しないこと。
-- 新DBは `ictscore_openapi`、Redis DBは1。旧DB `ictscore` とRedis DB0は保持する。
-  旧参加者・招待コードは新版に移行しない。
+- Discord認証は実接続。参加者は `ICTSC2026 予選` ギルドと対応チームロールを要求し、
+  招待コード入力を省略する。管理者は同ギルドの `ICTSC2026 Staff` ロールを要求する。
+- `ICTSC_DEV_FAKE_MODE=true` はGitHubコンテンツ同期・SStateを無効にするため維持する。
+  Discord資格情報はESOの `discord-oauth-client` Secretから参照する。
+- 新DBは `ictscore_openapi`、Redis DBは2。仮認証セッションのDB1と旧版のDB0は使用しない。
+  旧DB `ictscore` は保持し、旧参加者・招待コードは新版に移行しない。
+- 対応表は `config/regalia/dev-discord-teams.yaml`（48チーム、コード2〜49）。
+  IDはDiscordロール名で照合済み。団体・人数上限は開発用の初期値。
+  `python3 scripts/regalia/render-discord-teams.py`（PyYAML必要）で公開設定を生成し、
+  差分をコミットする。チーム本体は管理APIに保存し、初回登録には
+  `python3 scripts/regalia/import-teams.py` を使用する。既存データの不一致は上書きせず停止する。
+  通常の編集・メンバー確認は `/admin/teams` を使用する。
 - CNPG Databaseリソースで新DBを管理（削除時 retain）。PreSync Job が初期schemaと
   team color列を適用する。SQLはブランチの `backend/db/migrations` から取得したもの。
 - 旧版に戻す場合は Argo CD source を `workload/overlays/dev` に戻す。
