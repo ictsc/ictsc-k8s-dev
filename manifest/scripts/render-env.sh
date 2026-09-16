@@ -33,6 +33,8 @@ longhorn_httproute=""
 if [ "${env}" = "dev" ]; then
   regalia_oauth2_redirect_uris="        - https://contest.${domain}/oauth2/callback
         - https://admin-contest.${domain}/oauth2/callback"
+fi
+if [ "${env}" = "dev" ] || [ "${env}" = "prod" ]; then
   longhorn_oauth2_redirect_uri="        - https://longhorn.${domain}/oauth2/callback"
   longhorn_certificate_dns_name="    - longhorn.${domain}"
   longhorn_httproute="---

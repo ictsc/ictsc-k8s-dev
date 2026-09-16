@@ -1,0 +1,432 @@
+{
+  "snapshot": {
+    "commit_sha": "bece5402a7ce85b0310ce27ae28eaa529ad49100a72bc4dd9e7f963778544e09",
+    "repository": "development/sample-content",
+    "git_ref": "refs/heads/sample",
+    "manifest": {
+      "version": 1,
+      "problems": [
+        {
+          "body": "今日の昼ごはんは何ですか？ 予定でもいいので、ひと言どうぞ。",
+          "code": "R00",
+          "type": "DESCRIPTIVE",
+          "title": "今日の昼ごはん",
+          "category": "その他",
+          "max_score": 100,
+          "explanation": "昼ごはんについてひと言でも回答があれば100点。食べたもの、予定、未定など、内容は問いません。",
+          "section_slug": "sample",
+          "redeploy_rule": {
+            "type": "UNREDEPLOYABLE",
+            "penalty_threshold": null,
+            "penalty_percentage": null
+          }
+        },
+        {
+          "body": "全端末を固定IPv4アドレスで運用するLANで、端末A（192.0.2.10）へのpingが断続的に失敗します。IPを共有する冗長化構成はありません。\n調査すると、別端末のARPテーブルで192.0.2.10のMACアドレスが数秒ごとに変化していました。\n端末の設定台帳には次の情報があり、実際の設定も台帳どおりです。\n\n| 端末 | IPv4アドレス | MACアドレス |\n| --- | --- | --- |\n| A | 192.0.2.10/24 | 02:00:00:00:00:0a |\n| B | 192.0.2.10/24 | 02:00:00:00:00:0b |\n\n端末AのIPは変更できません。192.0.2.11は未使用で、端末Bへ割り当て可能です。安定した通信へ戻すための報告書を書いてください。\n\n## 報告書の書き方\n「原因」「判断の根拠」「修正内容」「修正後の確認方法」の4項目を、合計5〜10文程度で記述してください。設定やコマンドはコードブロックでも構いません。実機操作は不要です。確認方法は提案として書き、未実施の結果を実施済みとして書く必要はありません。",
+          "code": "R01",
+          "type": "DESCRIPTIVE",
+          "title": "同じIPなのに相手が変わる",
+          "category": "network",
+          "max_score": 100,
+          "explanation": "AとBのIP重複が原因。ARPの対応先が交互に変わることと台帳が根拠。Bを192.0.2.11/24に変更する。変更後はARP対応が安定しpingが継続成功するか確認する方針を示す。 採点目安: 原因30点、根拠20点、修正内容30点、確認方法20点。実行結果は要求しない。",
+          "section_slug": "sample",
+          "redeploy_rule": {
+            "type": "UNREDEPLOYABLE",
+            "penalty_threshold": null,
+            "penalty_percentage": null
+          }
+        },
+        {
+          "body": "Webサービスの監視スクリプトが、サービス停止中にも正常終了します。監視システムは終了コード0を正常、それ以外を異常として判定します。\nサービス停止中、curl単体は終了コード7を返しますが、次のスクリプト全体は0を返しました。\n\n```bash\n#!/bin/bash\ncurl -fsS http://127.0.0.1:8080/health >/dev/null\nprintf 'check finished\\n'\nexit 0\n```\n\nサービスが正常なときはcurlが0を返します。正常・異常が正しく伝わるよう、原因と修正案を報告してください。監視システム側の判定ルールは変更できません。\n\n## 報告書の書き方\n「原因」「判断の根拠」「修正内容」「修正後の確認方法」の4項目を、合計5〜10文程度で記述してください。設定やコマンドはコードブロックでも構いません。実機操作は不要です。確認方法は提案として書き、未実施の結果を実施済みとして書く必要はありません。",
+          "code": "R02",
+          "type": "DESCRIPTIVE",
+          "title": "異常なのに正常と報告される",
+          "category": "server",
+          "max_score": 100,
+          "explanation": "curl失敗後も処理が進み最後のexit 0で成功扱いとなる。curl直後にrc=$?を保存してexit \"$rc\"とする、curlを最後のコマンドにする、明示的なifで終了コードを返す、またはこの単純なスクリプトの先頭にset -eを加える修正が可。正常時0・停止時非0を確認する方針を示す。exit 0を消すだけではprintfの成功で0となるため不十分。 採点目安: 原因30点、根拠20点、修正内容30点、確認方法20点。実行結果は要求しない。",
+          "section_slug": "sample",
+          "redeploy_rule": {
+            "type": "UNREDEPLOYABLE",
+            "penalty_threshold": null,
+            "penalty_percentage": null
+          }
+        },
+        {
+          "body": "Dockerイメージsample-appを調査するため、アプリを起動せずコンテナを待機させようとしました。\n`docker run sample-app sleep infinity` を実行しましたが、アプリが起動し、すぐに終了しました。\nイメージの起動設定は以下のとおりです。\n\n```json\n{\n  \"Entrypoint\": [\"node\", \"/app/main.js\"],\n  \"Cmd\": null\n}\n```\n\nイメージ内の/usr/bin/sleepは存在し、infinityに対応しています。イメージを作り直さず、アプリの代わりにsleepを実行して待機させるための報告書を書いてください。\n\n## 報告書の書き方\n「原因」「判断の根拠」「修正内容」「修正後の確認方法」の4項目を、合計5〜10文程度で記述してください。設定やコマンドはコードブロックでも構いません。実機操作は不要です。確認方法は提案として書き、未実施の結果を実施済みとして書く必要はありません。",
+          "code": "R03",
+          "type": "DESCRIPTIVE",
+          "title": "sleepを指定したのに終了する",
+          "category": "server",
+          "max_score": 100,
+          "explanation": "引数sleep infinityはENTRYPOINTへの引数となりnode /app/main.js sleep infinityが実行される。docker run --entrypoint /usr/bin/sleep sample-app infinityで上書きする。sleepを主プロセスとして起動してコンテナが待機状態を保つか確認する方針を示す。 採点目安: 原因30点、根拠20点、修正内容30点、確認方法20点。実行結果は要求しない。",
+          "section_slug": "sample",
+          "redeploy_rule": {
+            "type": "UNREDEPLOYABLE",
+            "penalty_threshold": null,
+            "penalty_percentage": null
+          }
+        }
+      ],
+      "sections": [
+        {
+          "slug": "sample",
+          "ending": "2027-01-01T00:00:00Z",
+          "beginning": "2026-09-01T00:00:00Z",
+          "problem_codes": [
+            "R00",
+            "R01",
+            "R02",
+            "R03"
+          ]
+        }
+      ],
+      "announcements": [
+        {
+          "slug": "sample-guide",
+          "title": "サンプル問題について",
+          "markdown": "ひと言で答える「今日の昼ごはん」と、報告書を書く練習用の問題3問を用意しました。R01〜R03は問題文の設定・調査結果を使い、原因・根拠・修正内容・確認方法を文章で報告してください。実機操作は不要です。未実施の確認は確認方法として記述してください。各問100点です。",
+          "effective_from": "2026-09-01T00:00:00Z"
+        }
+      ]
+    }
+  },
+  "rules": "# サンプル環境のルール\n\n## この環境について\n問題の閲覧、報告書の作成、回答の提出を練習するための環境です。本番競技のルールとは異なります。\n実際のサーバーやネットワーク機器への接続・操作は不要です。問題文に記載された設定と調査結果だけを使って回答してください。\n\n## 問題と配点\n全4問、各100点、合計400点です。好きな順番で取り組んで構いません。\n\n- R00「今日の昼ごはん」：食べたものや予定をひと言で教えてください。未定でも構いません。\n- R01〜R03：技術的なトラブルについて、報告書を作成してください。\n\n## 報告書の書き方\nR01〜R03は、以下の4項目を合計5〜10文程度でまとめてください。見出し・箇条書き・コードブロックを使って構いません。\n\n1. **原因**：何が問題だったのか。\n2. **判断の根拠**：問題文のどの設定や調査結果から判断したか。\n3. **修正内容**：何をどう変更するか。必要に応じて設定やコマンドを書く。\n4. **修正後の確認方法**：何を確認し、どうなれば解決と判断できるか。\n\n実機操作は行わないため、確認方法は提案として書いてください。実行していない結果を「確認済み」と書く必要はありません。\n\n## 採点の目安\nR00は昼ごはんについてひと言回答があれば100点です。R01〜R03は原因30点、根拠20点、修正内容30点、確認方法20点を目安にします。条件を満たす別解も認めます。\n提出しただけで自動的に点数が付くとは限りません。採点結果がまだない場合は、提出履歴で受け付けられたことを確認してください。\n\n## 提出と再提出\n回答欄から提出し、提出履歴を確認してください。同じチームが同じ問題へ再提出する場合、システム上20分の間隔が必要です。\nこのサンプルでは問題環境の再展開は行いません。\n\n## 調べもの\n公開ドキュメントや自分のメモを参照して構いません。回答は自分の言葉でまとめてください。パスワードやトークンなどの秘密情報を回答に含めないでください。\n",
+  "teams": [
+    {
+      "code": 2,
+      "name": "よくわからんが直った",
+      "organization": "ICTSC2026 予選",
+      "member_limit": 10,
+      "color": "#A6E35F"
+    },
+    {
+      "code": 3,
+      "name": "ecc.net",
+      "organization": "ICTSC2026 予選",
+      "member_limit": 10,
+      "color": "#A6E35F"
+    },
+    {
+      "code": 4,
+      "name": "SIGINT",
+      "organization": "ICTSC2026 予選",
+      "member_limit": 10,
+      "color": "#A6E35F"
+    },
+    {
+      "code": 5,
+      "name": "にんにくチューブ",
+      "organization": "ICTSC2026 予選",
+      "member_limit": 10,
+      "color": "#A6E35F"
+    },
+    {
+      "code": 6,
+      "name": "LEFTOA",
+      "organization": "ICTSC2026 予選",
+      "member_limit": 10,
+      "color": "#A6E35F"
+    },
+    {
+      "code": 7,
+      "name": "ADSL",
+      "organization": "ICTSC2026 予選",
+      "member_limit": 10,
+      "color": "#A6E35F"
+    },
+    {
+      "code": 8,
+      "name": "MICON",
+      "organization": "ICTSC2026 予選",
+      "member_limit": 10,
+      "color": "#A6E35F"
+    },
+    {
+      "code": 9,
+      "name": "ふるこみっと２",
+      "organization": "ICTSC2026 予選",
+      "member_limit": 10,
+      "color": "#A6E35F"
+    },
+    {
+      "code": 10,
+      "name": "KogCoder",
+      "organization": "ICTSC2026 予選",
+      "member_limit": 10,
+      "color": "#A6E35F"
+    },
+    {
+      "code": 11,
+      "name": "chatナスカ",
+      "organization": "ICTSC2026 予選",
+      "member_limit": 10,
+      "color": "#A6E35F"
+    },
+    {
+      "code": 12,
+      "name": "大久保天才Broドキャスト",
+      "organization": "ICTSC2026 予選",
+      "member_limit": 10,
+      "color": "#A6E35F"
+    },
+    {
+      "code": 13,
+      "name": "ccuser",
+      "organization": "ICTSC2026 予選",
+      "member_limit": 10,
+      "color": "#A6E35F"
+    },
+    {
+      "code": 14,
+      "name": "さめかまぼこ！？",
+      "organization": "ICTSC2026 予選",
+      "member_limit": 10,
+      "color": "#A6E35F"
+    },
+    {
+      "code": 15,
+      "name": "後悔はsudo実行のあとで",
+      "organization": "ICTSC2026 予選",
+      "member_limit": 10,
+      "color": "#A6E35F"
+    },
+    {
+      "code": 16,
+      "name": "本質",
+      "organization": "ICTSC2026 予選",
+      "member_limit": 10,
+      "color": "#A6E35F"
+    },
+    {
+      "code": 17,
+      "name": "Convivial_net_A",
+      "organization": "ICTSC2026 予選",
+      "member_limit": 10,
+      "color": "#A6E35F"
+    },
+    {
+      "code": 18,
+      "name": "convivial_net_B",
+      "organization": "ICTSC2026 予選",
+      "member_limit": 10,
+      "color": "#A6E35F"
+    },
+    {
+      "code": 19,
+      "name": "Hello world",
+      "organization": "ICTSC2026 予選",
+      "member_limit": 10,
+      "color": "#A6E35F"
+    },
+    {
+      "code": 20,
+      "name": "結束baud",
+      "organization": "ICTSC2026 予選",
+      "member_limit": 10,
+      "color": "#A6E35F"
+    },
+    {
+      "code": 21,
+      "name": "302 Found",
+      "organization": "ICTSC2026 予選",
+      "member_limit": 10,
+      "color": "#A6E35F"
+    },
+    {
+      "code": 22,
+      "name": "金魚鹿",
+      "organization": "ICTSC2026 予選",
+      "member_limit": 10,
+      "color": "#A6E35F"
+    },
+    {
+      "code": 23,
+      "name": "team-rat-1",
+      "organization": "ICTSC2026 予選",
+      "member_limit": 10,
+      "color": "#A6E35F"
+    },
+    {
+      "code": 24,
+      "name": "季節畑",
+      "organization": "ICTSC2026 予選",
+      "member_limit": 10,
+      "color": "#A6E35F"
+    },
+    {
+      "code": 25,
+      "name": "じしゃく",
+      "organization": "ICTSC2026 予選",
+      "member_limit": 10,
+      "color": "#A6E35F"
+    },
+    {
+      "code": 26,
+      "name": "味処まるたか",
+      "organization": "ICTSC2026 予選",
+      "member_limit": 10,
+      "color": "#A6E35F"
+    },
+    {
+      "code": 27,
+      "name": ":zipper_mouth:",
+      "organization": "ICTSC2026 予選",
+      "member_limit": 10,
+      "color": "#A6E35F"
+    },
+    {
+      "code": 28,
+      "name": "REMIX",
+      "organization": "ICTSC2026 予選",
+      "member_limit": 10,
+      "color": "#A6E35F"
+    },
+    {
+      "code": 29,
+      "name": "team-rat-2",
+      "organization": "ICTSC2026 予選",
+      "member_limit": 10,
+      "color": "#A6E35F"
+    },
+    {
+      "code": 30,
+      "name": "大口銀行口座の方がかなりすごくね？",
+      "organization": "ICTSC2026 予選",
+      "member_limit": 10,
+      "color": "#A6E35F"
+    },
+    {
+      "code": 31,
+      "name": "あと58分で京都駅に着くよ",
+      "organization": "ICTSC2026 予選",
+      "member_limit": 10,
+      "color": "#A6E35F"
+    },
+    {
+      "code": 32,
+      "name": "破壊王ブレイキング4",
+      "organization": "ICTSC2026 予選",
+      "member_limit": 10,
+      "color": "#A6E35F"
+    },
+    {
+      "code": 33,
+      "name": "いいくるめ高専",
+      "organization": "ICTSC2026 予選",
+      "member_limit": 10,
+      "color": "#A6E35F"
+    },
+    {
+      "code": 34,
+      "name": "こんぶ",
+      "organization": "ICTSC2026 予選",
+      "member_limit": 10,
+      "color": "#A6E35F"
+    },
+    {
+      "code": 35,
+      "name": "P01TERGEIST",
+      "organization": "ICTSC2026 予選",
+      "member_limit": 10,
+      "color": "#A6E35F"
+    },
+    {
+      "code": 36,
+      "name": "なんでもいいよ",
+      "organization": "ICTSC2026 予選",
+      "member_limit": 10,
+      "color": "#A6E35F"
+    },
+    {
+      "code": 37,
+      "name": "ｲ左ｶﾛ貝大\\ (^o^) /",
+      "organization": "ICTSC2026 予選",
+      "member_limit": 10,
+      "color": "#A6E35F"
+    },
+    {
+      "code": 38,
+      "name": "r13s",
+      "organization": "ICTSC2026 予選",
+      "member_limit": 10,
+      "color": "#A6E35F"
+    },
+    {
+      "code": 39,
+      "name": "たかやま鯖審議会",
+      "organization": "ICTSC2026 予選",
+      "member_limit": 10,
+      "color": "#A6E35F"
+    },
+    {
+      "code": 40,
+      "name": "Layer8.0.1",
+      "organization": "ICTSC2026 予選",
+      "member_limit": 10,
+      "color": "#A6E35F"
+    },
+    {
+      "code": 41,
+      "name": "大学会館前(仮)",
+      "organization": "ICTSC2026 予選",
+      "member_limit": 10,
+      "color": "#A6E35F"
+    },
+    {
+      "code": 42,
+      "name": "traPPing...",
+      "organization": "ICTSC2026 予選",
+      "member_limit": 10,
+      "color": "#A6E35F"
+    },
+    {
+      "code": 43,
+      "name": "こけハウス",
+      "organization": "ICTSC2026 予選",
+      "member_limit": 10,
+      "color": "#A6E35F"
+    },
+    {
+      "code": 44,
+      "name": "千葉工大で、何を始めるつもりなのか。",
+      "organization": "ICTSC2026 予選",
+      "member_limit": 10,
+      "color": "#A6E35F"
+    },
+    {
+      "code": 45,
+      "name": "AI Sloper Pro MAX",
+      "organization": "ICTSC2026 予選",
+      "member_limit": 10,
+      "color": "#A6E35F"
+    },
+    {
+      "code": 46,
+      "name": "猫は神",
+      "organization": "ICTSC2026 予選",
+      "member_limit": 10,
+      "color": "#A6E35F"
+    },
+    {
+      "code": 47,
+      "name": "第三エリア前",
+      "organization": "ICTSC2026 予選",
+      "member_limit": 10,
+      "color": "#A6E35F"
+    },
+    {
+      "code": 48,
+      "name": "ITRC",
+      "organization": "ICTSC2026 予選",
+      "member_limit": 10,
+      "color": "#A6E35F"
+    },
+    {
+      "code": 49,
+      "name": "ノンフィクション",
+      "organization": "ICTSC2026 予選",
+      "member_limit": 10,
+      "color": "#A6E35F"
+    }
+  ]
+}

@@ -1,0 +1,11 @@
+apiVersion: postgresql.cnpg.io/v1
+kind: Database
+metadata:
+  name: regalia-openapi
+  namespace: scoreserver
+spec:
+  name: ictscore_openapi
+  owner: app
+  cluster:
+    name: postgres
+  databaseReclaimPolicy: retain

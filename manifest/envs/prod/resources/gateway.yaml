@@ -58,6 +58,6 @@ spec:
     - dex.k8s.ictsc.net
     - httpbin.k8s.ictsc.net
     - grafana.k8s.ictsc.net
-
+    - longhorn.k8s.ictsc.net
     - contest.k8s.ictsc.net
     - admin-contest.k8s.ictsc.net

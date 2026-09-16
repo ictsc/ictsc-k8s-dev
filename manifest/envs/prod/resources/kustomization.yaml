@@ -9,3 +9,30 @@ resources:
 # Gateway and Certificate depend on one another; apply them in one wave.
 commonAnnotations:
   argocd.argoproj.io/sync-wave: "0"
+
+patches:
+  - patch: |-
+      $patch: delete
+      apiVersion: gateway.networking.k8s.io/v1
+      kind: HTTPRoute
+      metadata:
+        name: httpbin
+        namespace: httpbin
+  - patch: |-
+      $patch: delete
+      apiVersion: gateway.networking.k8s.io/v1beta1
+      kind: ReferenceGrant
+      metadata:
+        name: httpbin-to-oauth2-proxy
+        namespace: oauth2-proxy
+  - target: {kind: Certificate, name: external}
+    patch: |-
+      - op: replace
+        path: /spec/dnsNames
+        value:
+          - argocd.k8s.ictsc.net
+          - dex.k8s.ictsc.net
+          - grafana.k8s.ictsc.net
+          - longhorn.k8s.ictsc.net
+          - contest.k8s.ictsc.net
+          - admin-contest.k8s.ictsc.net

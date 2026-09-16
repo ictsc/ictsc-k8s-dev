@@ -28,7 +28,7 @@ config:
       redirectURIs:
         - https://httpbin.k8s.ictsc.net/oauth2/callback
 
-
+        - https://longhorn.k8s.ictsc.net/oauth2/callback
     - id: argocd
       name: Argo CD
       secretEnv: ARGOCD_CLIENT_SECRET
