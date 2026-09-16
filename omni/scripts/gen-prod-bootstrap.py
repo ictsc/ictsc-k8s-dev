@@ -20,27 +20,31 @@ for folder in ['config', 'iso', 'patches']:
     (build / folder).mkdir(parents=True, exist_ok=True)
 for node in config['nodes']:
     hostname = node['hostname']
-    network = {
-        'hostname': hostname,
-        'nameservers': config['nameservers'],
-        'interfaces': [
-            {'interface': 'eth0', 'dhcp': False,
-             'addresses': [f"{node['external_ip']}/{ipaddress.ip_network(config['external_cidr']).prefixlen}"],
-             'routes': [{'network': '0.0.0.0/0', 'gateway': config['external_gateway']}]},
-            {'interface': 'eth1', 'dhcp': False,
-             'addresses': [f"{node['internal_ip']}/{ipaddress.ip_network(config['internal_network']).prefixlen}"]},
-        ],
-    }
-    patch = {'machine': {'network': network}}
-    patch_text = json.dumps(patch, indent=2) + '\n'
+    docs = [
+        {'apiVersion': 'v1alpha1', 'kind': 'HostnameConfig', 'auto': 'off', 'hostname': hostname},
+        {'apiVersion': 'v1alpha1', 'kind': 'ResolverConfig',
+         'nameservers': [{'address': address} for address in config['nameservers']]},
+    ]
+    for alias, bus, address in [
+        ('external', '0000:00:03.0', f"{node['external_ip']}/{ipaddress.ip_network(config['external_cidr']).prefixlen}"),
+        ('internal', '0000:00:04.0', f"{node['internal_ip']}/{ipaddress.ip_network(config['internal_network']).prefixlen}"),
+    ]:
+        docs.append({'apiVersion': 'v1alpha1', 'kind': 'LinkAliasConfig', 'name': alias,
+                     'selector': {'match': f'link.bus_path == "{bus}"'}})
+        link = {'apiVersion': 'v1alpha1', 'kind': 'LinkConfig', 'name': alias,
+                'up': True, 'addresses': [{'address': address}]}
+        if alias == 'external':
+            link['routes'] = [{'gateway': config['external_gateway']}]
+        docs.append(link)
+    patch_text = '\n---\n'.join(json.dumps(doc, indent=2) for doc in docs) + '\n'
     (build / 'patches' / f'{hostname}.yaml').write_text(patch_text)
-    # Partial v1alpha1 config is combined with SideroLink/EventSink/Kmsg documents.
-    bootstrap = {'version': 'v1alpha1', **patch}
-    body = json.dumps(bootstrap, indent=2) + '\n---\n' + join
+    # No v1alpha1 machine/cluster config: Omni supplies PKI and role after joining.
+    body = patch_text + '---\n' + join
     destination = build / 'config' / f'{hostname}.yaml'
     if destination.exists() and destination.read_text() != body:
         raise SystemExit(f'Refusing to replace existing bootstrap config: {destination}')
     destination.write_text(body)
+    subprocess.run(["talosctl", "validate", "--config", str(destination), "--mode", "cloud"], check=True)
     media = build / 'iso' / f'{hostname}.iso'
     if not media.exists():
         source = build / 'cidata' / hostname

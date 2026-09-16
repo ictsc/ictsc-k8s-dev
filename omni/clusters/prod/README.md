@@ -50,6 +50,9 @@ task tf:prod -- apply ../.omni/prod-network.tfplan
 ネットワーク作成後にOmni参加設定と静的アドレスだけをNoCloud媒体へ格納する。
 `task up`、`task talos-config`、`task talos-bootstrap` はprodでは使用しない。
 devの `talos/secrets.yaml` / `talos/talosconfig` も使用しない。
+bootstrap媒体にはHostnameConfig、ResolverConfig、PCI位置で選択するLinkAliasConfig、
+LinkConfigとOmni参加設定だけを入れる。クラスタPKIを要求する従来の
+`version: v1alpha1` 文書は含めず、生成時に全ノードを `talosctl validate` で検証する。
 
 ```bash
 umask 077
@@ -62,7 +65,14 @@ task tf:prod -- plan -out=../.omni/prod-infra.tfplan
 task tf:prod -- apply ../.omni/prod-infra.tfplan
 ```
 
-ノード起動後、OmniのMachineStatusのhostnameとネットワークアドレスを照合し、
+ノード起動後、次のスクリプトでOmniのMachineStatusのhostnameと外部・内部IPを
+照合する。6台とも接続済みで、devなど別クラスタに所属していないことを確認して
+Terraform用の入力を生成する。
+
+```bash
+python3 omni/scripts/bind-prod-machines.py
+```
+
 6台のUUIDを `nodes` 入力に設定する。devのUUIDは絶対に割り当てない。
 各要素は `machine_id`, `role` (`controlplane` / `worker`), `external_ip`,
 `internal_ip` を持つ。キーは `ictsc-prod-cp-1` 等のhostname。
@@ -94,5 +104,7 @@ DNS、Argo CDを準備する。現時点の `manifest/envs/prod` には欠落フ
   作成後のネットワークplanは差分なし。外部セグメントは `163.43.86.192/27`、
   Ingress用予約IPは `163.43.86.200`。
 - Terraform用Omni Operatorサービスアカウントは未作成。
-- VM・ディスクの作成と、サービスアカウントの承認・発行が必要。
-- 実機でのOmni登録、CNI、ストレージ、GitOps、Regaliaは未検証・未デプロイ。
+- 6ノード、踏み台、NFS、ディスクの作成は完了。6ノードともOmni接続と
+  hostname・外部IP・内部IPの照合を確認済み。サービスアカウントの承認・発行が必要。
+- Omniへのマシン登録まで完了。クラスタ割当、CNI、ストレージ、GitOps、
+  Regaliaは未検証・未デプロイ。

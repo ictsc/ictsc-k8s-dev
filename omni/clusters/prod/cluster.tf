@@ -100,25 +100,7 @@ resource "omni_config_patch" "network" {
   name     = "prod-network-${each.key}"
   cluster  = omni_cluster.prod.name
   selector = { cluster_machine = each.value.machine_id }
-  data = yamlencode({
-    machine = {
-      network = {
-        hostname    = each.key
-        nameservers = ["210.188.224.10", "210.188.224.11"]
-        interfaces = [
-          {
-            interface = "eth0", dhcp = false
-            addresses = ["${each.value.external_ip}/${var.external_prefix}"]
-            routes    = [{ network = "0.0.0.0/0", gateway = var.external_gateway }]
-          },
-          {
-            interface = "eth1", dhcp = false
-            addresses = ["${each.value.internal_ip}/24"]
-          }
-        ]
-      }
-    }
-  })
+  data     = file("${path.module}/../../../talos/build/ictsc-prod/patches/${each.key}.yaml")
 }
 
 resource "omni_machine_set_node" "nodes" {
