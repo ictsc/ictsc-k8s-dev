@@ -1,0 +1,8 @@
+# Back-channel OIDC traffic stays inside the cluster; issuer/login remain public.
+# https://oauth2-proxy.github.io/oauth2-proxy/configuration/overview/
+extraArgs:
+  skip-oidc-discovery: "true"
+  login-url: https://dex.k8s.ictsc.net/auth
+  redeem-url: http://dex.dex.svc.cluster.local:5556/token
+  oidc-jwks-url: http://dex.dex.svc.cluster.local:5556/keys
+  profile-url: http://dex.dex.svc.cluster.local:5556/userinfo

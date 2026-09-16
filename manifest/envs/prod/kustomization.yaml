@@ -62,3 +62,6 @@ patches:
       - op: add
         path: /spec/sources/0/helm/valueFiles/-
         value: $values/manifest/envs/prod/values/oauth2-proxy.yaml
+      - op: add
+        path: /spec/sources/0/helm/valueFiles/-
+        value: $values/manifest/envs/prod/values/oauth2-proxy-internal.yaml

@@ -84,7 +84,14 @@ resource "omni_config_patch" "controlplane" {
   cluster  = omni_cluster.prod.name
   selector = { machine_set = omni_machine_set.controlplane.name }
   data = yamlencode({
-    cluster = { etcd = { advertisedSubnets = ["192.168.100.0/24"] } }
+    cluster = {
+      etcd = {
+        advertisedSubnets = ["192.168.100.0/24"]
+        extraArgs         = { listen-metrics-urls = "http://0.0.0.0:2381" }
+      }
+      controllerManager = { extraArgs = { bind-address = "0.0.0.0" } }
+      scheduler         = { extraArgs = { bind-address = "0.0.0.0" } }
+    }
   })
 }
 
