@@ -30,6 +30,27 @@ spec:
         fsGroup: 10001
         seccompProfile:
           type: RuntimeDefault
+      # runtime-config.jsだけを起動時に書き換え可能にする。
+      initContainers:
+      - name: init-runtime-config
+        image: frontend
+        command: [sh, -c, 'touch /runtime/runtime-config.js']
+        volumeMounts:
+        - name: runtime-config
+          mountPath: /runtime
+        resources:
+          requests:
+            cpu: 10m
+            memory: 16Mi
+          limits:
+            cpu: 100m
+            memory: 32Mi
+        securityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          capabilities:
+            drop:
+            - ALL
       containers:
       - name: scoreserver
         image: frontend
@@ -38,6 +59,9 @@ spec:
         - name: http
           containerPort: 8080
         volumeMounts:
+        - name: runtime-config
+          mountPath: /var/www/contestant/runtime-config.js
+          subPath: runtime-config.js
         - name: nginx-cache
           mountPath: /var/cache/nginx
         - name: nginx-run
@@ -70,9 +94,11 @@ spec:
           value: http://scoreserver-backend:8080
         - name: NGINX_RESOLVER
           value: 127.0.0.1
-        # - name: ICTSC_DEMO_MODE
-        #   value: "true"
+        - name: ICTSC_DEMO_MODE
+          value: "true"
       volumes:
+      - name: runtime-config
+        emptyDir: {}
       - name: nginx-cache
         emptyDir: {}
       - name: nginx-run

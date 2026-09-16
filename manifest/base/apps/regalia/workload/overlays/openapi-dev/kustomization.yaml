@@ -8,12 +8,12 @@ namespace: scoreserver
 images:
 - name: backend
   newName: ghcr.io/ictsc/ictsc-regalia/backend
-  digest: sha256:e50f1f08867490e93e63a9c606dbd2405ff3badb67a72fd9c58eddecc734b1ab
-  newTag: preview-openapi-20260910-7
+  digest: sha256:2836f60d3ae1f146ee7915cc6bba5b8e84f113d80e96c643a7ffe379920bd8b5
+  newTag: sha-0cefe73
 - name: frontend
   newName: ghcr.io/ictsc/ictsc-regalia/frontend
-  digest: sha256:7439a89eb93344f5434d6a5a1cc1740ea8b0f9e6666e79bca71007091175cf8a
-  newTag: preview-openapi-20260910-7
+  digest: sha256:84954fa6d397574df7359798057ba72ffe9b3198391374fed857b06b2058441e
+  newTag: sha-0cefe73
 configMapGenerator:
 - name: scoreserver-openapi-migrations
   files:

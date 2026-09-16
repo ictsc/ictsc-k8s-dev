@@ -988,3 +988,16 @@ KMS と保管庫には `prevent_destroy` を設定している。クラスタ全
 - kubelogin (kubectl の OIDC 認証。Dex は導入済み)
 - Secret の Git 管理 (SOPS / sealed-secrets)
 - CI (terraform fmt / tflint / helm lint)
+
+### Regalia dev のデモモード
+
+`manifest/base/apps/regalia/workload/overlays/openapi-dev/frontend.yaml` の
+`ICTSC_DEMO_MODE: "true"` で、競技時間と再回答待ち時間の画面表示を固定する。
+解除は同じ値を `"false"` に変更して GitOps で反映し、ブラウザを再読み込みする。
+バックエンドの受付期間・提出間隔は実時間で判定される。
+デモ中は再提出の待ち時間表示も固定されるため、繰り返し提出する練習は
+デモモードを解除して行う。
+
+起動時に生成する `runtime-config.js` には専用の `emptyDir` をファイル単位で
+マウントする。init container と frontend は同じ digest のイメージを使用し、
+コンテナのルートファイルシステムは読み取り専用のまま維持する。
