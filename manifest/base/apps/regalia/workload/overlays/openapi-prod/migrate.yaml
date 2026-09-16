@@ -57,7 +57,26 @@ spec:
               drop:
                 - ALL
           args:
-            - "if [ \"$(psql -XAtqc \"SELECT to_regclass('public.teams') IS NOT NULL\")\" = f ]; then\n  psql -X -v ON_ERROR_STOP=1 -f /migrations/0001_init.sql\nfi\nif [ \"$(psql -XAtqc \"SELECT EXISTS (SELECT FROM information_schema.columns WHERE table_schema='public' AND table_name='teams' AND column_name='color')\")\" = f ]; then\n  psql -X -v ON_ERROR_STOP=1 -f /migrations/0002_team_color.sql\nfi\npsql -X -v ON_ERROR_STOP=1 -f /migrations/0003_demo_seed.sql\n"
+            - |
+              ready=false
+              for attempt in $(seq 1 210); do
+                if PGCONNECT_TIMEOUT=2 psql -XAtqc 'SELECT 1' >/dev/null 2>&1; then
+                  ready=true
+                  break
+                fi
+                sleep 2
+              done
+              if [ "$ready" != true ]; then
+                echo 'Timed out waiting for the prod database' >&2
+                exit 1
+              fi
+              if [ "$(psql -XAtqc "SELECT to_regclass('public.teams') IS NOT NULL")" = f ]; then
+                psql -X -v ON_ERROR_STOP=1 -f /migrations/0001_init.sql
+              fi
+              if [ "$(psql -XAtqc "SELECT EXISTS (SELECT FROM information_schema.columns WHERE table_schema='public' AND table_name='teams' AND column_name='color')")" = f ]; then
+                psql -X -v ON_ERROR_STOP=1 -f /migrations/0002_team_color.sql
+              fi
+              psql -X -v ON_ERROR_STOP=1 -f /migrations/0003_demo_seed.sql
           volumeMounts:
             - name: migrations
               mountPath: /migrations

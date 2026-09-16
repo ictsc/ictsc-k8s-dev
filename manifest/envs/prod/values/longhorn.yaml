@@ -18,6 +18,8 @@ persistence:
   dataEngine: v1
 
 defaultSettings:
+  # Dedicated data disks: retain 20% headroom without over-provisioning.
+  storageReservedPercentageForDefaultDisk: 20
   defaultDataPath: /var/mnt/longhorn
   defaultReplicaCount: '{"v1":"3","v2":"3"}'
   systemManagedComponentsNodeSelector: node.kubernetes.io/role:worker

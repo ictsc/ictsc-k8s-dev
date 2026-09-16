@@ -129,7 +129,7 @@ GitOpsの続きは下記の `task gitops:prod` で実行する。
   テストPodからクラスタ内DNS解決を確認済み。
 - kubelet証明書承認を導入済み。6台のserving証明書が発行され、Podログ取得も確認済み。
 - GitOps基盤を導入済み。Longhorn・NFSのテストPVCで読み書きを確認済み。
-- 公開DNS/TLSとGitHub OAuthのprod callbackは未確認。Regaliaは未デプロイ。
+- 公開DNS/TLSとGitHub OAuthのprod callbackを設定済み。Regaliaは下記のデモ構成で管理する。
 
 ## GitOps
 
@@ -144,8 +144,8 @@ prodのcallback `https://dex.k8s.ictsc.net/callback` の対応が別途必要。
 
 基盤ApplicationはCilium、Argo CD、cert-manager、Dex、oauth2-proxy、監視・ログ、
 Longhorn、NFS CSI、CloudNativePG、metrics-server等。監視データはLonghorn、
-Lokiの5Gi PVCはprodのNFSに保存する。Regalia・DB・ImageUpdaterの更新対象と
-Discordアラート通知はまだ有効化していない。
+Lokiの5Gi PVCはprodのNFSに保存する。RegaliaとDBもGitOps管理する。
+ImageUpdaterのRegalia更新対象とDiscordアラート通知はまだ有効化していない。
 
 公開Gateway・証明書・HTTPRouteは `prod-edge` Applicationに分離している。
 公開DNS/証明書の待ち状態が、基盤の同期を止めないようにするため。
@@ -162,3 +162,27 @@ kubectl --kubeconfig .kube/prod -n gateway get gateway,certificate
 2026-09-17: Longhornの監視用PVC 3個は3 replicaでhealthy、LokiのNFS PVCはBound。
 一時Podで両StorageClassの書き込み・読み戻しを検証し、テスト用PVC/Podは削除済み。
 公開VIPへのHTTP-01チャレンジはHost指定で200応答を確認。証明書はDNS未設定で発行待ち。
+
+## Regalia demo
+
+今回はprodでもdevと同じデモを公開する。`openapi-prod` は稼働確認済みdevの
+backend/frontendイメージdigestを固定し、`ICTSC_DEV_FAKE_MODE=true` と
+`ICTSC_DEMO_MODE=true` を設定する。DB/Valkeyはprod専用で、参加者・提出物・
+セッションをdevからコピーしない。デモモードは表示上の時計・状態を固定するもので、
+サーバー側の提出受付は実時間のまま。
+
+- `https://contest.k8s.ictsc.net/`: 前段のGitHub OAuthなし。Regalia自身のDiscord認証を使用。
+- `https://admin-contest.k8s.ictsc.net/`: contestantホストの `/admin/` にリダイレクト。
+- `https://longhorn.k8s.ictsc.net/`: GitHub (Dex / oauth2-proxy) 認証付き。
+- httpbinはprodから削除済み。
+
+Discord Appには以下のRedirect URLを登録する。
+
+- `https://contest.k8s.ictsc.net/api/v1/auth/discord/callback`
+- `https://contest.k8s.ictsc.net/api/v1/admin/auth/discord/callback`
+
+初期コンテンツは `config/regalia/prod-demo-content.json` に保存したdevのサンプル4問、
+ルール、48チーム定義。`python3 scripts/regalia/render-prod-demo-seed.py` で
+`0003_demo_seed.sql` を生成する。PreSyncのmigrationで初回投入し、既存の
+コンテンツ・チーム・編集済みルールは上書きしない。再同期で提出や採点も消さない。
+PostgreSQLは3インスタンスで各1GiのLonghorn単一replica、Valkeyは1GiのLonghornを使用。
