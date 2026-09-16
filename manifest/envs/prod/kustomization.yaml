@@ -47,6 +47,16 @@ patches:
       - op: add
         path: /spec/sources/0/helm/valueFiles/-
         value: $values/manifest/envs/prod/values/kube-prometheus-stack-storage.yaml
+      - op: add
+        path: /spec/ignoreDifferences
+        value:
+          - group: ""
+            kind: PersistentVolumeClaim
+            jsonPointers:
+              - /spec/volumeName
+      - op: add
+        path: /spec/syncPolicy/syncOptions/-
+        value: RespectIgnoreDifferences=true
   - target: {kind: Application, name: argocd}
     patch: |-
       - op: add

@@ -112,9 +112,7 @@ kubectl --kubeconfig .kube/prod get nodes
 
 証明書承認はdevのArgo CD Applicationと同じv0.11.0 / ha構成の1 replica。
 GitOps導入後は既存Applicationの管理へ引き継ぐ。
-続いてprod GitOps manifestの修復・render、必要なSecret、
-DNS、Argo CDを準備する。現時点の `manifest/envs/prod` には欠落ファイル参照と
-古いRegalia Applicationパッチがあり、そのまま同期しないこと。
+GitOpsの続きは下記の `task gitops:prod` で実行する。
 
 ## 2026-09-17 時点の構築状況
 
@@ -130,4 +128,37 @@ DNS、Argo CDを準備する。現時点の `manifest/envs/prod` には欠落フ
 - Gateway API 1.6.1、Cilium 1.20.1を導入済み。CoreDNS・Hubbleが稼働し、
   テストPodからクラスタ内DNS解決を確認済み。
 - kubelet証明書承認を導入済み。6台のserving証明書が発行され、Podログ取得も確認済み。
-- ストレージのKubernetes側設定、GitOps、Regaliaは未検証・未デプロイ。
+- GitOps基盤を導入済み。Longhorn・NFSのテストPVCで読み書きを確認済み。
+- 公開DNS/TLSとGitHub OAuthのprod callbackは未確認。Regaliaは未デプロイ。
+
+## GitOps
+
+`task gitops:prod` はprod専用kubeconfigを更新し、必要なSecret・Argo CDを
+bootstrapして `manifest/root-prod.yaml` を適用する。manifestは先にpushする。
+GitOpsの管理元は `main` の `manifest/envs/prod`。
+
+初回のSecret作成だけはdevのread-only deploy keyとGitHub OAuth設定を参照する。
+内部OIDCクライアントSecretとcookie keyはprod専用に生成し、既存Secretは上書きしない。
+Secret値はGitにもローカルファイルにも保存しない。GitHub OAuthアプリ側には
+prodのcallback `https://dex.k8s.ictsc.net/callback` の対応が別途必要。
+
+基盤ApplicationはCilium、Argo CD、cert-manager、Dex、oauth2-proxy、監視・ログ、
+Longhorn、NFS CSI、CloudNativePG、metrics-server等。監視データはLonghorn、
+Lokiの5Gi PVCはprodのNFSに保存する。Regalia・DB・ImageUpdaterの更新対象と
+Discordアラート通知はまだ有効化していない。
+
+公開Gateway・証明書・HTTPRouteは `prod-edge` Applicationに分離している。
+公開DNS/証明書の待ち状態が、基盤の同期を止めないようにするため。
+`*.k8s.ictsc.net` のAレコードを `163.43.86.200` に向ける必要がある。
+HTTP-01認証のため80/tcpも必要。Omni経由のkubectlは公開DNSと独立して利用できる。
+
+```bash
+task omni:prod:kubeconfig
+kubectl --kubeconfig .kube/prod -n argocd get applications
+kubectl --kubeconfig .kube/prod get pvc -A
+kubectl --kubeconfig .kube/prod -n gateway get gateway,certificate
+```
+
+2026-09-17: Longhornの監視用PVC 3個は3 replicaでhealthy、LokiのNFS PVCはBound。
+一時Podで両StorageClassの書き込み・読み戻しを検証し、テスト用PVC/Podは削除済み。
+公開VIPへのHTTP-01チャレンジはHost指定で200応答を確認。証明書はDNS未設定で発行待ち。
