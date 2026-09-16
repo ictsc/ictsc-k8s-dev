@@ -16,3 +16,8 @@ alertmanager:
 grafana:
   persistence:
     storageClassName: longhorn
+  # Avoid generating a different admin password on each Argo CD render.
+  admin:
+    existingSecret: grafana-admin
+    userKey: admin-user
+    passwordKey: admin-password
