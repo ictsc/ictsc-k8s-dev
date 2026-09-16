@@ -10,7 +10,7 @@
 Omni本体の `omni/terraform.tfstate` とdevのstateは使用しない。
 このrootのstateは `omni/clusters/prod/terraform.tfstate` に分離する。
 公式Omni Terraform Providerは `0.1.0-alpha.3` に固定している。
-`terraform validate` は検証済みだが、Omni v1.8.0への実applyは未検証。
+Omni v1.8.0に19リソースのapplyを実施済み。再planは差分なし。
 
 ## 規模
 
@@ -79,32 +79,55 @@ python3 omni/scripts/bind-prod-machines.py
 `external_gateway` も入力する。入力JSONは `.omni/prod-cluster.tfvars.json`
 に保存する。
 
-Omni管理にはOperatorサービスアカウントの明示承認・発行が必要。
-鍵は `OMNI_SERVICE_ACCOUNT_KEY` 環境変数に渡し、Gitへ保存しない。
+Omni管理には承認済みのOperatorサービスアカウント `terraform-ictsc-prod` を使う。
+鍵はGit管理外の `.omni/prod-omni.env` に権限600で保存し、Taskから読み込む。
 
 ```bash
-unset TF_WORKSPACE TF_VAR_talos_version
-terraform -chdir=omni/clusters/prod init
-terraform -chdir=omni/clusters/prod plan \
+task tf:omni:prod -- init
+task tf:omni:prod -- plan \
   -var-file=../../../.omni/prod-cluster.tfvars.json \
   -out=../../../.omni/prod-cluster.tfplan
-terraform -chdir=omni/clusters/prod apply ../../../.omni/prod-cluster.tfplan
+task tf:omni:prod -- apply ../../../.omni/prod-cluster.tfplan
 ```
 
-OmniがAPIを起動したらprod専用kubeconfigを取得し、Ciliumを導入してノードの
-Readyを確認する。続いてprod GitOps manifestの修復・render、必要なSecret、
+prod専用kubeconfigは以下で取得・更新する。有効期間は1時間。
+
+```bash
+task omni:prod:kubeconfig
+kubectl --kubeconfig .kube/prod get nodes
+```
+
+OmniがAPIを起動したら、GitOps起動前のネットワークと証明書承認を導入する。
+
+```bash
+kubectl --kubeconfig .kube/prod apply --server-side -f \
+  https://github.com/kubernetes-sigs/gateway-api/releases/download/v1.6.1/experimental-install.yaml
+helm upgrade --install cilium cilium/cilium --version 1.20.1 \
+  --kubeconfig .kube/prod --namespace kube-system \
+  -f manifest/base/infra/cilium/values.yaml \
+  -f manifest/envs/prod/values/cilium.yaml --wait --timeout 10m
+kubectl --kubeconfig .kube/prod apply -k omni/clusters/prod/bootstrap/cert-approver
+kubectl --kubeconfig .kube/prod get nodes
+```
+
+証明書承認はdevのArgo CD Applicationと同じv0.11.0 / ha構成の1 replica。
+GitOps導入後は既存Applicationの管理へ引き継ぐ。
+続いてprod GitOps manifestの修復・render、必要なSecret、
 DNS、Argo CDを準備する。現時点の `manifest/envs/prod` には欠落ファイル参照と
 古いRegalia Applicationパッチがあり、そのまま同期しないこと。
 
-## 2026-09-17 時点の未完了事項
+## 2026-09-17 時点の構築状況
 
 - `tk1a` のルータ＋スイッチ、内部スイッチ作成がともに
   旧プロジェクトでは `409 limit_count_in_zone` で失敗。
   新しい `ICTSC_yosen` プロジェクトでネットワーク2件のapplyが完了。
   作成後のネットワークplanは差分なし。外部セグメントは `163.43.86.192/27`、
   Ingress用予約IPは `163.43.86.200`。
-- Terraform用Omni Operatorサービスアカウントは未作成。
+- Terraform用Omni Operatorサービスアカウントは作成済み。
 - 6ノード、踏み台、NFS、ディスクの作成は完了。6ノードともOmni接続と
-  hostname・外部IP・内部IPの照合を確認済み。サービスアカウントの承認・発行が必要。
-- Omniへのマシン登録まで完了。クラスタ割当、CNI、ストレージ、GitOps、
-  Regaliaは未検証・未デプロイ。
+  hostname・外部IP・内部IPの照合を確認済み。
+- Omniクラスタ作成と6台の割当が完了し、全6ノードReady。
+- Gateway API 1.6.1、Cilium 1.20.1を導入済み。CoreDNS・Hubbleが稼働し、
+  テストPodからクラスタ内DNS解決を確認済み。
+- kubelet証明書承認を導入済み。6台のserving証明書が発行され、Podログ取得も確認済み。
+- ストレージのKubernetes側設定、GitOps、Regaliaは未検証・未デプロイ。

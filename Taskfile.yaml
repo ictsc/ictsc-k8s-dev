@@ -20,6 +20,18 @@ vars:
   ACME_EMAIL: '{{.ACME_EMAIL | default "TODO-set-me@ictsc.net"}}'
 
 tasks:
+  tf:omni:prod:
+    desc: prod専用Omni認証でクラスタのTerraformを実行
+    silent: true
+    cmds:
+      - bash scripts/omni-prod.sh terraform {{.CLI_ARGS}}
+
+  omni:prod:kubeconfig:
+    desc: prod専用kubeconfigを取得・更新 (有効期間1時間)
+    silent: true
+    cmds:
+      - bash scripts/omni-prod.sh kubeconfig
+
   tf:
     desc: '環境別APIキーでTerraformを実行 (task tf ENV=prod -- plan)'
     requires:
