@@ -29,7 +29,7 @@ variable "external_band_width" {
   type = map(number)
   default = {
     dev  = 100
-    prod = 500
+    prod = 100
   }
 }
 
@@ -133,7 +133,7 @@ variable "nfs_size" {
   description = "NFS アプライアンスの容量 (GiB)"
   default = {
     dev  = 20
-    prod = 100
+    prod = 20
   }
 }
 
@@ -162,28 +162,28 @@ variable "worker_node" {
   type = map(number)
   default = {
     dev  = 3
-    prod = 6
+    prod = 3
   }
 }
 variable "worker_node_cpu" {
   type = map(number)
   default = {
     dev  = 6
-    prod = 2
+    prod = 6
   }
 }
 variable "worker_node_mem" {
   type = map(number)
   default = {
     dev  = 12
-    prod = 4
+    prod = 12
   }
 }
 variable "worker_node_disk" {
   type = map(number)
   default = {
     dev  = 40
-    prod = 80
+    prod = 40
   }
 }
 
@@ -193,6 +193,6 @@ variable "longhorn_disk_size" {
   description = "worker ごとに追加する Longhorn 専用 SSD の容量 (GiB、0 なら無効)"
   default = {
     dev  = 20
-    prod = 0
+    prod = 20
   }
 }

@@ -21,6 +21,10 @@ done
 q() { jq -r "$1" "${input}"; }
 
 cluster_name="$(q '.cluster_name')"
+if [ "${cluster_name}" = "ictsc-prod" ]; then
+  echo "ERROR: prod は Omni 管理です。omni/scripts/gen-prod-bootstrap.py を使用してください" >&2
+  exit 1
+fi
 cluster_endpoint="$(q '.cluster_endpoint')"
 kubernetes_version="$(q '.kubernetes_version')"
 talos_version="$(q '.talos_version')"

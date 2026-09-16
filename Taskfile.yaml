@@ -20,6 +20,28 @@ vars:
   ACME_EMAIL: '{{.ACME_EMAIL | default "TODO-set-me@ictsc.net"}}'
 
 tasks:
+  tf:
+    desc: '環境別APIキーでTerraformを実行 (task tf ENV=prod -- plan)'
+    requires:
+      vars: [ENV]
+    silent: true
+    env:
+      SAKURA_TARGET_ENV: '{{.ENV}}'
+    cmds:
+      - bash scripts/terraform-env.sh "$SAKURA_TARGET_ENV" {{.CLI_ARGS}}
+
+  tf:dev:
+    desc: dev用APIキー・workspaceでTerraformを実行
+    silent: true
+    cmds:
+      - bash scripts/terraform-env.sh dev {{.CLI_ARGS}}
+
+  tf:prod:
+    desc: prod用APIキー・workspaceでTerraformを実行
+    silent: true
+    cmds:
+      - bash scripts/terraform-env.sh prod {{.CLI_ARGS}}
+
   sakura-secret-import:
     desc: 既存 Secret の値をさくらへコピー (namespace と values ファイルを引数で指定)
     silent: true
