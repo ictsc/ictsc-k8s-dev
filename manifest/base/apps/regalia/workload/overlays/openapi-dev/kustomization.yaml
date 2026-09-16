@@ -12,8 +12,8 @@ images:
   newTag: sha-0cefe73
 - name: frontend
   newName: ghcr.io/ictsc/ictsc-regalia/frontend
-  digest: sha256:84954fa6d397574df7359798057ba72ffe9b3198391374fed857b06b2058441e
-  newTag: sha-0cefe73
+  digest: sha256:8d16dc520e20e086d9abc2c0beabc3f562bd20945ff9cc13d695168fd6d2d98f
+  newTag: sha-ada0f02
 configMapGenerator:
 - name: scoreserver-openapi-migrations
   files:
