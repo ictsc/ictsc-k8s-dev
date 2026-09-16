@@ -3,6 +3,7 @@ resources:
   - ./edge-application.yaml
   - ./resources/storageclass-nfs.yaml
   - ./resources/longhorn.yaml
+  - ./resources/longhorn-metrics-policy.yaml
 
 patches:
   # Regalia is enabled separately after production auth and release selection.
