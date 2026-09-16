@@ -70,6 +70,8 @@ spec:
           value: http://scoreserver-backend:8080
         - name: NGINX_RESOLVER
           value: 127.0.0.1
+        # - name: ICTSC_DEMO_MODE
+        #   value: "true"
       volumes:
       - name: nginx-cache
         emptyDir: {}
