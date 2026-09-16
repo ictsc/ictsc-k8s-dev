@@ -22,7 +22,7 @@ source "$credential_file"
 export SAKURACLOUD_ACCESS_TOKEN SAKURACLOUD_ACCESS_TOKEN_SECRET
 export TF_WORKSPACE="$target"
 if [ "$target" = prod ]; then
-  export TF_VAR_talos_version=v1.13.9
+  export TF_VAR_talos_version=v1.13.10
 fi
 # Backend AWS_* credentials are intentionally unchanged.
 python3 - "$root/config/sakura-projects.json" "$target" <<'PY'
