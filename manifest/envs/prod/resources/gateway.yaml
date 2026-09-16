@@ -1,6 +1,4 @@
 # このファイルは `task render-env-values` が terraform output から生成する
-#
-# Ingress VIP はこの Gateway が保持し、振り分けは HTTPRoute で行う。
 apiVersion: v1
 kind: Namespace
 metadata:
@@ -17,9 +15,8 @@ spec:
   gatewayClassName: cilium
   addresses:
     - type: IPAddress
-      value: "203.0.113.4"
+      value: "163.43.86.200"
   listeners:
-    # cert-manager が ACME チャレンジ用の HTTPRoute をここに生やすので必須
     - name: http
       protocol: HTTP
       port: 80
@@ -46,16 +43,21 @@ metadata:
   name: external
   namespace: gateway
   annotations:
-    argocd.argoproj.io/sync-wave: "-10"
+    # Gateway と Certificate は相互依存するため同じ wave に置く。
+    argocd.argoproj.io/sync-wave: "-15"
+    # cert-manager の CRD は wave -20 で作られる。
+    argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
 spec:
   secretName: external-tls
   issuerRef:
     name: letsencrypt
     kind: ClusterIssuer
-  # HTTP-01 ではワイルドカードが取れないのでホストを列挙する
+  # HTTP-01 はワイルドカード証明書に対応しない。
   dnsNames:
     - argocd.k8s.ictsc.net
     - dex.k8s.ictsc.net
     - httpbin.k8s.ictsc.net
+    - grafana.k8s.ictsc.net
+
     - contest.k8s.ictsc.net
     - admin-contest.k8s.ictsc.net

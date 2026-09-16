@@ -20,6 +20,18 @@ vars:
   ACME_EMAIL: '{{.ACME_EMAIL | default "TODO-set-me@ictsc.net"}}'
 
 tasks:
+  gitops:prod:
+    desc: prod専用kubeconfigでArgo CDをbootstrapしてGitOpsを開始
+    cmds:
+      - task: omni:prod:kubeconfig
+      - python3 scripts/prod-gitops-secrets.py
+      - >-
+        helm upgrade --install argocd argo/argo-cd --version 10.2.3
+        --kubeconfig .kube/prod --namespace argocd --create-namespace
+        -f manifest/base/infra/argocd/values.yaml
+        -f manifest/envs/prod/values/argocd.yaml --wait --timeout 10m
+      - kubectl --kubeconfig .kube/prod apply -f manifest/root-prod.yaml
+
   tf:omni:prod:
     desc: prod専用Omni認証でクラスタのTerraformを実行
     silent: true

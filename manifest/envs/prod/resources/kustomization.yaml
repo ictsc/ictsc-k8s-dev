@@ -1,0 +1,11 @@
+# Keep edge readiness (DNS/TLS) independent from the infrastructure apps.
+resources:
+  - cilium-lb-ip-pool.yaml
+  - cilium-l2-announcement.yaml
+  - gateway.yaml
+  - cluster-issuer.yaml
+  - httproutes.yaml
+
+# Gateway and Certificate depend on one another; apply them in one wave.
+commonAnnotations:
+  argocd.argoproj.io/sync-wave: "0"

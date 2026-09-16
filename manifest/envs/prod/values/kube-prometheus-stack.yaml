@@ -1,0 +1,25 @@
+# このファイルは `task render-env-values` が terraform output から生成する
+grafana:
+  envValueFrom:
+    GF_AUTH_GENERIC_OAUTH_CLIENT_SECRET:
+      secretKeyRef:
+        name: grafana-oidc
+        key: clientSecret
+  grafana.ini:
+    server:
+      domain: grafana.k8s.ictsc.net
+      root_url: https://grafana.k8s.ictsc.net
+    auth:
+      disable_login_form: false
+      oauth_auto_login: false
+    auth.generic_oauth:
+      enabled: true
+      name: GitHub (Dex)
+      client_id: grafana
+      scopes: openid profile email groups
+      auth_url: https://dex.k8s.ictsc.net/auth
+      token_url: https://dex.k8s.ictsc.net/token
+      api_url: https://dex.k8s.ictsc.net/userinfo
+      # Dex の groups は "<org>:<team>" 形式。
+      role_attribute_path: contains(groups[*], 'ictsc:ictsc2026') && 'Admin' || 'Viewer'
+      allow_assign_grafana_admin: true

@@ -1,13 +1,12 @@
 # このファイルは `task render-env-values` が terraform output から生成する
-#
-# HTTP-01 を Gateway API の HTTPRoute で解く。cert-manager は Gateway を
-# 書き換えず、チャレンジ中だけ一時的な HTTPRoute を生やす。
 apiVersion: cert-manager.io/v1
 kind: ClusterIssuer
 metadata:
   name: letsencrypt
   annotations:
-    argocd.argoproj.io/sync-wave: "-12"
+    argocd.argoproj.io/sync-wave: "-16"
+    # cert-manager の CRD は wave -20 で作られる。
+    argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
 spec:
   acme:
     server: https://acme-v02.api.letsencrypt.org/directory

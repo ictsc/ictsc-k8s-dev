@@ -1,0 +1,22 @@
+# このファイルは `task render-env-values` が terraform output から生成する
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: nfs
+  annotations:
+    argocd.argoproj.io/sync-wave: "-1"
+    storageclass.kubernetes.io/is-default-class: "true"
+provisioner: nfs.csi.k8s.io
+parameters:
+  server: 192.168.100.150
+  share: /export
+  # subDir を省略すると PV ごとに分離される。NFS では fsGroup が効かない。
+  mountPermissions: "0777"
+reclaimPolicy: Delete
+volumeBindingMode: Immediate
+allowVolumeExpansion: true
+mountOptions:
+  # さくらの NFS アプライアンスは NFSv4.0 まで。
+  - nfsvers=4.0
+  - hard
+  - noatime

@@ -1,0 +1,18 @@
+# NFS から Longhorn へ配置する prod の監視データを保持する。
+prometheus:
+  prometheusSpec:
+    storageSpec:
+      volumeClaimTemplate:
+        spec:
+          storageClassName: longhorn
+
+alertmanager:
+  alertmanagerSpec:
+    storage:
+      volumeClaimTemplate:
+        spec:
+          storageClassName: longhorn
+
+grafana:
+  persistence:
+    storageClassName: longhorn

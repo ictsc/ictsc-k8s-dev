@@ -1,15 +1,39 @@
 resources:
   - ../../base
-  - ./resources/cilium-lb-ip-pool.yaml
-  - ./resources/cilium-l2-announcement.yaml
-  - ./resources/gateway.yaml
-  - ./resources/cluster-issuer.yaml
+  - ./edge-application.yaml
   - ./resources/storageclass-nfs.yaml
-  - ./resources/alertmanager-discord.yaml
-  - ./resources/rbac-oidc.yaml
-  - ./resources/httproutes.yaml
+  - ./resources/longhorn.yaml
 
 patches:
+  # Regalia is enabled separately after production auth and release selection.
+  - patch: |-
+      $patch: delete
+      apiVersion: argoproj.io/v1alpha1
+      kind: Application
+      metadata:
+        name: regalia
+        namespace: argocd
+  - patch: |-
+      $patch: delete
+      apiVersion: argoproj.io/v1alpha1
+      kind: Application
+      metadata:
+        name: regalia-postgres
+        namespace: argocd
+  - patch: |-
+      $patch: delete
+      apiVersion: argoproj.io/v1alpha1
+      kind: Application
+      metadata:
+        name: regalia-valkey
+        namespace: argocd
+  - patch: |-
+      $patch: delete
+      apiVersion: argocd-image-updater.argoproj.io/v1alpha1
+      kind: ImageUpdater
+      metadata:
+        name: regalia
+        namespace: argocd
   - target: {kind: Application, name: cilium}
     patch: |-
       - op: add
@@ -20,6 +44,9 @@ patches:
       - op: add
         path: /spec/sources/0/helm/valueFiles/-
         value: $values/manifest/envs/prod/values/kube-prometheus-stack.yaml
+      - op: add
+        path: /spec/sources/0/helm/valueFiles/-
+        value: $values/manifest/envs/prod/values/kube-prometheus-stack-storage.yaml
   - target: {kind: Application, name: argocd}
     patch: |-
       - op: add
@@ -35,36 +62,3 @@ patches:
       - op: add
         path: /spec/sources/0/helm/valueFiles/-
         value: $values/manifest/envs/prod/values/oauth2-proxy.yaml
-  - target: {kind: Application, name: regalia}
-    patch: |-
-      - op: replace
-        path: /spec/source/path
-        value: manifest/base/apps/regalia/workload/overlays/prod
-  - target: {kind: Application, name: regalia-postgres}
-    patch: |-
-      - op: add
-        path: /spec/sources/0/helm/valueFiles/-
-        value: $values/manifest/envs/prod/values/regalia-postgres.yaml
-  - target: {kind: ImageUpdater, name: regalia}
-    patch: |-
-      - op: replace
-        path: /spec/writeBackConfig/gitConfig/writeBackTarget
-        value: kustomization:/manifest/base/apps/regalia/workload/overlays/prod
-      - op: replace
-        path: /spec/applicationRefs/0/images/0/commonUpdateSettings/updateStrategy
-        value: semver
-      - op: replace
-        path: /spec/applicationRefs/0/images/0/commonUpdateSettings/allowTags
-        value: 'regexp:^v[0-9]+\.[0-9]+\.[0-9]+$'
-      - op: replace
-        path: /spec/applicationRefs/0/images/1/commonUpdateSettings/updateStrategy
-        value: semver
-      - op: replace
-        path: /spec/applicationRefs/0/images/1/commonUpdateSettings/allowTags
-        value: 'regexp:^v[0-9]+\.[0-9]+\.[0-9]+$'
-      - op: replace
-        path: /spec/applicationRefs/0/images/2/commonUpdateSettings/updateStrategy
-        value: semver
-      - op: replace
-        path: /spec/applicationRefs/0/images/2/commonUpdateSettings/allowTags
-        value: 'regexp:^v[0-9]+\.[0-9]+\.[0-9]+$'
