@@ -373,7 +373,7 @@ Image UpdaterはArgo CDに登録済みのこのリポジトリのSSH認証情報
 
 dev は `codex/openapi-contract-rebuild` の OpenAPI 版を試験配置している。
 設定は `manifest/base/apps/regalia/workload/overlays/openapi-dev`。イメージを
-`preview-openapi-20260910-7` タグのdigestで固定し、試験中は dev の ImageUpdater を無効化する。
+`preview-openapi-20260916-3` タグのdigestで固定し、試験中は dev の ImageUpdater を無効化する。
 
 - 参加者: https://contest.k8s-dev.ictsc.net/
 - 管理画面: https://contest.k8s-dev.ictsc.net/admin/ （旧 admin-contest ホストから転送）
