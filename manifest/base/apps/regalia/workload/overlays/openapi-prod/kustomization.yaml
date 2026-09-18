@@ -13,7 +13,7 @@ images:
 - name: frontend
   newName: ghcr.io/ictsc/ictsc-regalia/frontend
   digest: sha256:ce15724a01ea6c73fda7e76a6d2ab64243dcf3203c01fc97d13c75c2cbcb7c7c
-  newTag: preview-openapi-20260916-3
+  newTag: sha-2e39a17
 configMapGenerator:
 - name: scoreserver-openapi-migrations
   files:
