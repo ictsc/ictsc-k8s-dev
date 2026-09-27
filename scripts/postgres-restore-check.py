@@ -4,6 +4,7 @@ import argparse
 import json
 from pathlib import Path
 import re
+import shlex
 import subprocess
 import time
 
@@ -66,7 +67,7 @@ def main():
                         'name': 'barman-cloud.cloudnative-pg.io',
                         'parameters': {'barmanObjectName': 'postgres-source', 'serverName': 'postgres'}}}]}})
     print(f'Restoring into {ns}/postgres-restore; source remains unchanged', flush=True)
-    subprocess.run(kube + ['-n', ns, 'wait', '--for=condition=Ready', 'cluster/postgres-restore', '--timeout=15m'], check=True)
+    subprocess.run(kube + ['-n', ns, 'wait', '--for=condition=Ready', 'clusters.postgresql.cnpg.io/postgres-restore', '--timeout=15m'], check=True)
     query = "SELECT json_build_object('teams',(SELECT count(*) FROM teams),'content_snapshots',(SELECT count(*) FROM content_snapshots),'answers',(SELECT count(*) FROM answers),'marking_results',(SELECT count(*) FROM marking_results));"
     result = subprocess.run(kube + ['-n', ns, 'exec', 'postgres-restore-1', '-c', 'postgres', '--',
                                     'psql', '-XAt', '-v', 'ON_ERROR_STOP=1', '-d', 'ictscore_openapi', '-c', query],
@@ -74,7 +75,7 @@ def main():
     if result.returncode:
         raise SystemExit('Restore SQL verification failed; inspect the isolated cluster')
     print(f'Restore SQL succeeded in {int(time.monotonic() - started)} seconds: {result.stdout.strip()}')
-    print(f'After reviewing results, remove only this drill namespace: kubectl -n {ns} delete cluster postgres-restore; kubectl delete namespace {ns}')
+    print('After reviewing results, remove only this drill namespace: ' + shlex.join(kube + ['delete', 'namespace', ns]))
 
 
 if __name__ == '__main__':

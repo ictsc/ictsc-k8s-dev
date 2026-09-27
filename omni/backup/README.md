@@ -84,3 +84,12 @@ devの認証をprodへ流用せず、Omniだけを唯一の認証情報保管先
 - `omni-backup.timer` を有効化。毎時実行、最大5分のランダム遅延。
 - Omni/Dex は再起動しておらず、既存サービスは稼働継続。
 - 隔離Omniへのログインを含む完全な災害復旧演習と、失敗時の外部通知は未検証・未接続。
+
+### 管理対象クラスタのetcdバックアップで判明した残件
+
+2026-09-27、`etcdbackupstatuses` はprodで `s3 store is not initialized`、
+最終成功はnullだった。`backup_interval=1h` だけでは保存先が設定されない。
+既存のprodサービスアカウントはOperator権限でS3設定へアクセスできないため、
+管理者による `EtcdBackupS3Configs` の設定と初回成功確認が必要。
+Omni VM本体のresticバックアップとは別の未完了項目としてIssue #14で追跡する。
+設定方法は[公式etcdバックアップ手順](https://omni.siderolabs.com/how-to-guides/etcd-backups)を参照。

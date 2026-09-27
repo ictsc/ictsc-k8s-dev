@@ -58,10 +58,23 @@ PROD_GITOPS_SECRETS_FILE=/secure/new-prod-bundle.json python3 scripts/prod-gitop
 出力は新規mode600ファイルのみ。ベース64は暗号化ではないため放置しない。
 キーをローテーションした際は、既存保管値と運用値の差分を確認して保管庫も更新する。
 
+## 初回導入時の注意
+
+初回のpluginコンテナ追加ではDB Podの再作成が必要。2026-09-27にはprimaryの
+smart shutdownが180秒待機し、その間アプリのDB接続が一時的に利用不可となった。
+初回の自動Backupも旧Podにpluginが無い間は失敗するため、全Podが2/2 Readyになった後で
+手動Backupを取得し、`LastBackupSucceeded=True` と `ContinuousArchiving=True` を確認する。
+
+バックアップ直後に最新WALがまだ開いている場合、復元は `WAL not found` で待機する。
+`archive_timeout=300s` による保存を待つか、計画した検証時にprimaryで
+`SELECT pg_switch_wal();` を実行し、`pg_stat_archiver.last_archived_wal` の更新を確認する。
+取得完了だけで復元可能と判断しない。`kubectl get backup` はLonghornの同名リソースを
+指すため、CNPGのBackupは `backups.postgresql.cnpg.io` と完全修飾する。
+
 ## 検証と復旧
 
 ```bash
-kubectl --kubeconfig .kube/config --context admin@ictsc-dev -n scoreserver get scheduledbackup,backup,objectstore
+kubectl --kubeconfig .kube/config --context admin@ictsc-dev -n scoreserver get scheduledbackups.postgresql.cnpg.io,backups.postgresql.cnpg.io,objectstores.barmancloud.cnpg.io
 python3 scripts/postgres-restore-check.py dev --namespace restore-check-dev-20260927
 ```
 
@@ -78,3 +91,19 @@ retentionを有効にしない。既存namespaceへの再実行を拒否する�
 
 参考: [Barman Cloud plugin](https://cloudnative-pg.io/plugin-barman-cloud/docs/usage/)、
 [S3互換ストレージの設定](https://cloudnative-pg.io/plugin-barman-cloud/docs/object_stores/)。
+
+## 2026-09-27 の実測
+
+- dev/prod: `postgres-verify-20260927` がcompleted。ContinuousArchiving/LastBackupSucceededはTrue。
+- dev復元は173秒（初回WAL待ち・再試行込み）、prod復元は63秒。
+- 復元先はアプリから隔離した新規namespace。検証後に削除。
+- 主要4テーブルは元DBと復元DBの件数および全行の内容ハッシュが一致。
+
+| 環境 | teams | content_snapshots | answers | marking_results |
+|---|---:|---:|---:|---:|
+| dev | 48 | 10 | 146 | 96 |
+| prod | 48 | 1 | 157 | 96 |
+
+これは今回のデータ量での復元・SQL整合性検証であり、将来の所要時間や業務上の採点妥当性を保証しない。
+両環境のPrometheusでBarmanの最終バックアップ時刻が全3Podから取得できることも確認した。
+prodの公開 `/api/v1/health` は `ok`、GitOps全ApplicationはSynced/Healthy。
