@@ -1,11 +1,12 @@
 name: terraform
 
-# PR では plan まで。apply は手動起動だけにしてある。
+# PR は認証不要の静的検証。PKIを要する実環境plan/applyは手動起動だけ。
 # push で自動 apply にすると、マージした瞬間にノードが作り変わる。
 on:
   pull_request:
     paths:
       - "terraform/**"
+      - "backups/terraform/**"
       - "talos/**"
       - "Taskfile.yaml"
       - "aqua.yaml"
@@ -17,7 +18,7 @@ on:
         required: true
         default: dev
         type: choice
-        options: [dev, prod]
+        options: [dev]  # prod は Omni 管理。task tf:prod / task tf:omni:prod を使う。
       action:
         description: "plan だけ見るか、apply まで実行するか"
         required: true
@@ -27,25 +28,50 @@ on:
 
 permissions:
   contents: read
-  pull-requests: write
-
-env:
-  SAKURACLOUD_ACCESS_TOKEN: ${{ secrets.SAKURACLOUD_ACCESS_TOKEN }}
-  SAKURACLOUD_ACCESS_TOKEN_SECRET: ${{ secrets.SAKURACLOUD_ACCESS_TOKEN_SECRET }}
-  SAKURACLOUD_ZONE: ${{ vars.SAKURACLOUD_ZONE }}
-  TF_STATE_BUCKET: ${{ vars.TF_STATE_BUCKET }}
-  TF_CLI_ARGS_init: -backend-config=bucket=${{ vars.TF_STATE_BUCKET }}
-  AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-  AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-  # さくらのオブジェクトストレージ側の不具合のワークアラウンド (.envrc.tmpl 参照)
-  AWS_REQUEST_CHECKSUM_CALCULATION: when_required
-  ACME_EMAIL: ${{ vars.ACME_EMAIL }}
-  KUBECONFIG: ${{ github.workspace }}/.kube/config
-  TALOSCONFIG: ${{ github.workspace }}/talos/talosconfig
 
 jobs:
-  terraform:
+  validate:
+    if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
+    env:
+      TF_WORKSPACE: dev
+    steps:
+      - uses: actions/checkout@v5
+      - uses: aquaproj/aqua-installer@v4.0.5
+        with:
+          aqua_version: v2.62.3
+      - name: Validate without backend credentials or cluster PKI
+        working-directory: terraform
+        run: |
+          terraform init -backend=false -input=false
+          terraform fmt -check -diff
+          terraform validate
+          tflint
+      - name: Validate shared backup infrastructure
+        working-directory: backups/terraform
+        env:
+          TF_WORKSPACE: default
+        run: |
+          terraform init -backend=false -input=false
+          terraform fmt -check -diff
+          terraform validate
+
+  terraform:
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    env:
+      SAKURACLOUD_ACCESS_TOKEN: ${{ secrets.SAKURACLOUD_ACCESS_TOKEN }}
+      SAKURACLOUD_ACCESS_TOKEN_SECRET: ${{ secrets.SAKURACLOUD_ACCESS_TOKEN_SECRET }}
+      SAKURACLOUD_ZONE: ${{ vars.SAKURACLOUD_ZONE }}
+      TF_STATE_BUCKET: ${{ vars.TF_STATE_BUCKET }}
+      TF_CLI_ARGS_init: -backend-config=bucket=${{ vars.TF_STATE_BUCKET }}
+      AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+      # さくらのオブジェクトストレージ側の不具合のワークアラウンド (.envrc.tmpl 参照)
+      AWS_REQUEST_CHECKSUM_CALCULATION: when_required
+      ACME_EMAIL: ${{ vars.ACME_EMAIL }}
+      KUBECONFIG: ${{ github.workspace }}/.kube/config
+      TALOSCONFIG: ${{ github.workspace }}/talos/talosconfig
     # apply は environment 経由にして、必要なら承認を挟めるようにする
     environment: ${{ (inputs.action == 'apply') && 'infrastructure' || '' }}
     steps:
@@ -76,9 +102,8 @@ jobs:
       # talos/secrets.yaml はクラスタの PKI 本体で git に入っていない。
       # 無いまま talos-config を走らせると *別クラスタの* 秘密情報を新規生成して
       # しまうため、Taskfile 側で停止するようにしてある。
-      # apply したい場合は TALOS_SECRETS を必ず設定すること。
+      # 手動planでも同じPKIからmachine configを生成する。PRには渡さない。
       - name: Talos の secrets を復元
-        if: ${{ inputs.action == 'apply' }}
         env:
           TALOS_SECRETS: ${{ secrets.TALOS_SECRETS }}
         run: |
@@ -89,6 +114,13 @@ jobs:
           umask 077
           printf '%s' "${TALOS_SECRETS}" | base64 -d > talos/secrets.yaml
           test -s talos/secrets.yaml
+
+      - name: Generate dev bootstrap files for plan
+        if: ${{ inputs.action == 'plan' }}
+        run: |
+          mkdir -p talos/build
+          terraform -chdir=terraform output -json talos_input > talos/build/talos-input.json
+          bash talos/scripts/gen-config.sh talos/build/talos-input.json
 
       - name: plan
         if: ${{ inputs.action != 'apply' }}

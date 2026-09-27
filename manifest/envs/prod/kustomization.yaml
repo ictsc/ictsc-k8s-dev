@@ -1,11 +1,14 @@
 resources:
   - ../../base
+  - ../../base/infra/plugin-barman-cloud
+  - ./resources/postgres-backup-alerts.yaml
   - ./edge-application.yaml
   - ./resources/storageclass-nfs.yaml
   - ./resources/storageclass-longhorn-single-replica.yaml
   - ./resources/regalia-openapi-database.yaml
   - ./resources/longhorn.yaml
   - ./resources/longhorn-metrics-policy.yaml
+  - ./resources/alertmanager-discord.yaml
 
 patches:
   # prod exposes Regalia directly; no httpbin demo service.
@@ -71,6 +74,9 @@ patches:
         value: manifest/base/apps/regalia/workload/overlays/openapi-prod
   - target: {kind: Application, name: regalia-postgres}
     patch: |-
+      - op: add
+        path: /spec/sources/0/helm/valueFiles/-
+        value: $values/manifest/base/apps/regalia/postgres/backup-values.yaml
       - op: add
         path: /spec/sources/0/helm/valueFiles/-
         value: $values/manifest/envs/prod/values/regalia-postgres.yaml

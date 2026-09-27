@@ -58,6 +58,11 @@ ip_addresses[cp+2+wk]             踏み台
 必要なグローバルIP数は `cp + worker + 3` (VIP 2個 + 踏み台 1個)。
 netmask は後から変更できない (`terraform/vars.tf` の WARNING を参照) ので余裕を持たせている。
 
+Talos API（50000/tcp）は踏み台限定だが、CPのKubernetes API（6443/tcp）は
+送信元制限なしでTLS・認証・RBACにより保護する。VIPだけが公開対象ではない。
+prodの通常のkubectlはOmni API proxyを使用し、上記の予約API VIPが稼働しているとは仮定しない。
+経路と実測結果は [API公開方針](docs/api-exposure.md) を参照。
+
 ### Longhorn (dev)
 
 dev の各 worker に20GiB SSDを1本追加し、Longhorn v1.12.1のV1 Data Engineで
@@ -637,7 +642,8 @@ $ cat ~/.kube/cache/oidc-login/* | jq -r .id_token \
 
 ## talosctl は踏み台経由で使う
 
-`apid` (50000) と `trustd` (50001) はパケットフィルタで**踏み台からのみ**に絞ってある
+`apid` (50000) はパケットフィルタで**踏み台からのみ**に絞ってある。
+`trustd` (50001) はノード間の証明書配布に必要なため、クラスタの外部CIDRから許可する
 (`terraform/packet-filter.tf`)。手元から直接は届かないので、ラッパー経由で叩く。
 
 ```console
@@ -987,7 +993,19 @@ KMS と保管庫には `prevent_destroy` を設定している。クラスタ全
 - ストレージ (Rook/Ceph)
 - kubelogin (kubectl の OIDC 認証。Dex は導入済み)
 - Secret の Git 管理 (SOPS / sealed-secrets)
-- CI (terraform fmt / tflint / helm lint)
+
+GitOps CI は dev/prod の Kustomize、各 Application の固定 Helm chart と環境別 values、
+workload overlay を展開してスキーマ検証する。CRDは利用chartと固定版のbootstrap定義から取得し、
+スキーマ不明のリソースも失敗扱いにする。vendorのCRD定義そのものは検査を除外し、
+そこから抽出したschemaでカスタムリソースを検査する。nullフィールドはAPIのpruningに
+合わせて除去してから検査する。Secretやクラスタ認証は不要。
+ローカルでは `aqua install` と `python -m pip install PyYAML==6.0.3` の後、
+`python scripts/validate-gitops.py --environment dev`（または `prod`）で実行できる。
+これは構文・スキーマの検証であり、Admission/CELや実機動作の保証ではない。
+TerraformのPR検証はbackend/PKI認証なしでfmt・validate・tflintを実行する。
+従来のPR planは未生成machine configのfilemd5で失敗していたため、実環境planは
+手動workflowへ分離した。手動dev planでは既存PKIからconfig/ISOを生成してからplanする。
+prodはOmni管理のためこの従来CIの対象外で、環境専用の `task tf:prod` / `task tf:omni:prod` を使う。
 
 ### Regalia dev のデモモード
 
