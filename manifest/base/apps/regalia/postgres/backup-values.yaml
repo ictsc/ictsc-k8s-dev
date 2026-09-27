@@ -23,6 +23,8 @@ backups:
     jobs: 1
   instanceSidecarConfiguration:
     env:
+      - name: AWS_DEFAULT_REGION
+        value: jp-north-1
       - name: AWS_REQUEST_CHECKSUM_CALCULATION
         value: when_required
       - name: AWS_RESPONSE_CHECKSUM_VALIDATION

@@ -43,8 +43,11 @@ def main():
            'labels': {'ictsc.net/purpose': 'restore-check'}}}, create=True)
     started = time.monotonic()
     apply({'apiVersion': 'networking.k8s.io/v1', 'kind': 'NetworkPolicy',
-           'metadata': {'name': 'deny-ingress', 'namespace': ns},
-           'spec': {'podSelector': {}, 'policyTypes': ['Ingress'], 'ingress': []}})
+           'metadata': {'name': 'operator-only', 'namespace': ns},
+           'spec': {'podSelector': {}, 'policyTypes': ['Ingress'], 'ingress': [{
+               'from': [{'namespaceSelector': {'matchLabels': {'kubernetes.io/metadata.name': 'cnpg-system'}}}],
+               'ports': [{'protocol': 'TCP', 'port': 8000}],
+           }]}})
     apply({'apiVersion': 'v1', 'kind': 'Secret', 'metadata': {'name': 'postgres-backup-s3', 'namespace': ns},
            'type': 'Opaque', 'data': secret['data']}, create=True)
     # No retention policy and no WAL archiver: a recovery drill must not prune

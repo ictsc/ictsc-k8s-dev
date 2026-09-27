@@ -41,6 +41,7 @@ python3 scripts/postgres-restore-check.py dev --namespace restore-check-dev-2026
 ```
 
 復元スクリプトは新しいnamespaceだけを作り、アプリからのIngressを遮断する。
+CNPG operatorからの管理用8000/tcpだけを許可し、復元DBを通常のアプリへ公開しない。
 元のクラスタ名 `postgres` のアーカイブから別名のDBへ復元し、WAL archiverや
 retentionを有効にしない。既存namespaceへの再実行を拒否する。
 復元DBでチーム・コンテンツ・提出テーブルを照会し件数と所要時間だけを表示する。
