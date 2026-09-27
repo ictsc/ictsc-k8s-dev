@@ -20,6 +20,12 @@ vars:
   ACME_EMAIL: '{{.ACME_EMAIL | default "TODO-set-me@ictsc.net"}}'
 
 tasks:
+  alert-secrets:prod:
+    desc: prod の Discord 通知先を作成 (PROD_DISCORD_WEBHOOK_URL 必須、既存値は保持)
+    cmds:
+      - task: omni:prod:kubeconfig
+      - python3 scripts/prod-alert-secret.py
+
   gitops:prod:
     desc: prod専用kubeconfigでArgo CDをbootstrapしてGitOpsを開始
     cmds:

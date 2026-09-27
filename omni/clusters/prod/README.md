@@ -162,7 +162,16 @@ DBデータ・DB認証や通知先・ストレージ用キーはそれぞれの�
 基盤ApplicationはCilium、Argo CD、cert-manager、Dex、oauth2-proxy、監視・ログ、
 Longhorn、NFS CSI、CloudNativePG、metrics-server等。監視データはLonghorn、
 Lokiの5Gi PVCはprodのNFSに保存する。RegaliaとDBもGitOps管理する。
-ImageUpdaterのRegalia更新対象とDiscordアラート通知はまだ有効化していない。
+ImageUpdaterのRegalia更新対象はまだ有効化していない。
+Discordアラート通知は `monitoring/alertmanager-discord` を参照する。初回は
+承認した通知先を `PROD_DISCORD_WEBHOOK_URL` に安全に読み込んで
+`task alert-secrets:prod` を実行してから root を同期する。既存 Secret は保持し、
+dev の通知先は自動流用しない。Webhook URL を Git・コマンド引数・ログに残さない。
+AlertmanagerConfig の発報・復旧通知は通常アラートで有効、Kubernetes Event の
+通知は復旧通知なし。試験通知を送る場合は通知先とタイミングを事前に合意する。
+反映後は Alertmanager の設定リロード成功、生成された receiver/route、
+`alertmanager_notifications_failed_total` を確認する。実際の配送確認は
+通知先での受信と照合し、設定反映だけで配送成功とは判断しない。
 
 公開Gateway・証明書・HTTPRouteは `prod-edge` Applicationに分離している。
 公開DNS/証明書の待ち状態が、基盤の同期を止めないようにするため。
