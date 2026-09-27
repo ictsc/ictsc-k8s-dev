@@ -987,7 +987,19 @@ KMS と保管庫には `prevent_destroy` を設定している。クラスタ全
 - ストレージ (Rook/Ceph)
 - kubelogin (kubectl の OIDC 認証。Dex は導入済み)
 - Secret の Git 管理 (SOPS / sealed-secrets)
-- CI (terraform fmt / tflint / helm lint)
+
+GitOps CI は dev/prod の Kustomize、各 Application の固定 Helm chart と環境別 values、
+workload overlay を展開してスキーマ検証する。CRDは利用chartと固定版のbootstrap定義から取得し、
+スキーマ不明のリソースも失敗扱いにする。vendorのCRD定義そのものは検査を除外し、
+そこから抽出したschemaでカスタムリソースを検査する。nullフィールドはAPIのpruningに
+合わせて除去してから検査する。Secretやクラスタ認証は不要。
+ローカルでは `aqua install` と `python -m pip install PyYAML==6.0.3` の後、
+`python scripts/validate-gitops.py --environment dev`（または `prod`）で実行できる。
+これは構文・スキーマの検証であり、Admission/CELや実機動作の保証ではない。
+TerraformのPR検証はbackend/PKI認証なしでfmt・validate・tflintを実行する。
+従来のPR planは未生成machine configのfilemd5で失敗していたため、実環境planは
+手動workflowへ分離した。手動dev planでは既存PKIからconfig/ISOを生成してからplanする。
+prodはOmni管理のためこの従来CIの対象外で、環境専用の `task tf:prod` / `task tf:omni:prod` を使う。
 
 ### Regalia dev のデモモード
 
