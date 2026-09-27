@@ -20,6 +20,13 @@ vars:
   ACME_EMAIL: '{{.ACME_EMAIL | default "TODO-set-me@ictsc.net"}}'
 
 tasks:
+  postgres-backup-secrets:
+    desc: DB バックアップ用の限定キーを Terraform から対象クラスタへ投入 (ENV=dev|prod)
+    requires:
+      vars: [ENV]
+    cmds:
+      - python3 scripts/postgres-backup-secret.py {{.ENV}}
+
   gitops:prod:
     desc: prod専用kubeconfigでArgo CDをbootstrapしてGitOpsを開始
     cmds:
