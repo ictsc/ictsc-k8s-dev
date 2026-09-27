@@ -15,7 +15,6 @@ exec 9>/var/lib/omni-backup/backup.lock
 flock -n 9 || { echo 'Another backup is running' >&2; exit 1; }
 stage=$(mktemp -d /var/lib/omni-backup/snapshot.XXXXXXXX)
 trap 'rm -rf -- "$stage"' EXIT
-export ETCDCTL_API=3
 # etcdctl / etcdutl must match the running embedded etcd major/minor version.
 etcdctl --endpoints=http://127.0.0.1:2379 --command-timeout=60s snapshot save "$stage/etcd.snapshot"
 etcdutl snapshot status "$stage/etcd.snapshot" --write-out=json > "$stage/etcd-status.json"

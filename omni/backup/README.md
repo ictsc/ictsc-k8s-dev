@@ -1,7 +1,8 @@
 # Omni 本体のバックアップと復旧
 
 Issue #14。これは管理対象Kubernetesのetcdバックアップとは別の、Omni VMの復旧用。
-実機へは未導入。sudo操作の承認と外部保存先が決まるまでtimerを有効にしない。
+保存先は共通リソースアカウントの専用バケット `ictsc-omni-backups`。
+復旧用保管庫 `ictsc-recovery-secrets` の `omni-restic` にS3限定キーとresticパスワードを保存する。
 
 ## 導入前提
 
@@ -14,6 +15,19 @@ Issue #14。これは管理対象Kubernetesのetcdバックアップとは別の
   S3なら専用の `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` を設定する。値をGitやログへ書かない。
 - backend bucket、PostgreSQL backup bucketと認証情報を共用しない。
 - `restic init` は保存先が空であることを確認して初回のみ実施する。
+
+2026-09-27の導入対象: Omni v1.8.0、embedded etcd 3.6.11。
+VMには公式SHA256SUMS照合済みetcdctl/etcdutl 3.6.11とUbuntuのrestic 0.16.4を導入。
+Omni更新時はetcdバージョンの一致を再確認する。
+
+```bash
+python3 omni/scripts/install-backup.py
+```
+このスクリプトはSecret Managerから値を読み、SSH標準入力だけでroot専用ファイルへ渡す。
+既存の認証設定が異なる場合は上書きせず停止し、timerも自動では有効にしない。
+SSHの既存ホストキーとTerraformのOmni接続先を使い、sudo認証も出力しない。
+KMS・保管庫とバケットの所有stateは `backups/terraform`。詳細は
+[DBバックアップ手順](../../docs/postgres-backups.md) を参照。
 
 ## 取得と自動化
 
@@ -61,3 +75,12 @@ Omni停止中のbreak-glassは事前発行・保管した緊急用Talos/Kubernet
 devの認証をprodへ流用せず、Omniだけを唯一の認証情報保管先にしない。
 
 参考: [Omni DB backup](https://docs.siderolabs.com/omni/self-hosted/back-up-omni-db)。
+
+## 2026-09-27 の実機検証
+
+- 専用S3リポジトリへ暗号化バックアップ `7ab612a6` を取得。サービス停止なし。
+- 新規ディレクトリへ復元し、etcd snapshot restore（772 keys）、SQLite integrity、必須設定・鍵の存在を確認。
+- `restic check --read-data` は全データの読み取り検査に成功。
+- `omni-backup.timer` を有効化。毎時実行、最大5分のランダム遅延。
+- Omni/Dex は再起動しておらず、既存サービスは稼働継続。
+- 隔離Omniへのログインを含む完全な災害復旧演習と、失敗時の外部通知は未検証・未接続。
