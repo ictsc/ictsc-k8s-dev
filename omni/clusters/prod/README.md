@@ -137,10 +137,27 @@ GitOpsの続きは下記の `task gitops:prod` で実行する。
 bootstrapして `manifest/root-prod.yaml` を適用する。manifestは先にpushする。
 GitOpsの管理元は `main` の `manifest/envs/prod`。
 
-初回のSecret作成だけはdevのread-only deploy keyとGitHub OAuth設定を参照する。
-内部OIDCクライアントSecretとcookie keyはprod専用に生成し、既存Secretは上書きしない。
-Secret値はGitにもローカルファイルにも保存しない。GitHub OAuthアプリ側には
+Secret作成処理はdevクラスタに接続しない。既存prod Secretは読み取り検証だけで保持し、
+不足分がある場合は `PROD_GITOPS_SECRETS_FILE` で指定したprod専用復旧bundleから
+作成する。認証/APIエラーは「Secretが無い」と扱わず停止し、OIDCの片側だけが
+古いbundleも書き込み前に拒否する。GitHub OAuthアプリ側には
 prodのcallback `https://dex.k8s.ictsc.net/callback` の対応が別途必要。
+
+復旧bundleは次の手順で作成できる。新しいファイルだけをmode 600で作り、
+既存ファイル・symlinkは上書きしない。中身はbase64であり暗号化ではないため、
+作成後は承認済みの暗号化保管庫へ保存し、作業用コピーを削除する。
+Git・ログ・Issueへ値を貼らない。保管庫への保存と全損復旧演習は別途確認する。
+
+```bash
+task omni:prod:kubeconfig
+python3 scripts/prod-gitops-secrets.py --export .omni/prod-gitops-recovery.json
+# 保管庫から復号したmode-600のprod bundleを使う場合
+PROD_GITOPS_SECRETS_FILE=.omni/prod-gitops-recovery.json task gitops:prod
+```
+
+bundleの対象はdeploy key、Dexと各OIDC client、Grafana admin、Discord OAuth。
+DBデータ・DB認証や通知先・ストレージ用キーはそれぞれのバックアップ/供給経路で復旧する。
+初回構築ではprod用の認証情報をこの形式で用意し、devから暗黙にコピーしない。
 
 基盤ApplicationはCilium、Argo CD、cert-manager、Dex、oauth2-proxy、監視・ログ、
 Longhorn、NFS CSI、CloudNativePG、metrics-server等。監視データはLonghorn、
