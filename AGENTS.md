@@ -105,7 +105,15 @@ config endpoints <ip1> <ip2> <ip3>
 
 ## Secret 管理
 
-現状は **Git に置かず、クラスタ内に直接作成**している。`task up` → `task start-gitops` の依存で `task auth-secrets` + `task argocd-repo-key` が自動実行される。
+Secret値はGitへ置かない。devは既存のさくらSecret Manager/ESO連携を使用する。
+prodの既存GitOps Secretは保持し、不足時はprod専用の復旧用bundleから戻す。
+`task up` → `task start-gitops` の依存で `task auth-secrets` + `task argocd-repo-key` が実行される。
+
+DB/Omniのバックアップ認証・Omniの暗号化パスワード・prodの復旧用bundleは、共通リソース
+アカウントのさくらSecret Manager保管庫 `ictsc-recovery-secrets` に保管する。
+`backups/terraform` の独立stateで保管庫とprod DB/Omniの専用バケットを管理し、
+各S3キーには自身のバケットだけを許可する。詳細は `docs/postgres-backups.md` と
+`omni/backup/README.md` を参照。
 
 ### OIDC 認証（Dex 連携）
 - `argocd` namespace の Secret `argocd-oidc`
