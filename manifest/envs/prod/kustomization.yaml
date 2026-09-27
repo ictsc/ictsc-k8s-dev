@@ -8,6 +8,7 @@ resources:
   - ./resources/regalia-openapi-database.yaml
   - ./resources/longhorn.yaml
   - ./resources/longhorn-metrics-policy.yaml
+  - ./resources/alertmanager-discord.yaml
 
 patches:
   # prod exposes Regalia directly; no httpbin demo service.

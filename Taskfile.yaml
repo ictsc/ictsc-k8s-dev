@@ -21,11 +21,17 @@ vars:
 
 tasks:
   postgres-backup-secrets:
-    desc: DB バックアップ用の限定キーを Terraform から対象クラスタへ投入 (ENV=dev|prod)
+    desc: DB バックアップ用の限定キーをさくら Secret Manager から対象クラスタへ投入 (ENV=dev|prod)
     requires:
       vars: [ENV]
     cmds:
       - python3 scripts/postgres-backup-secret.py {{.ENV}}
+
+  alert-secrets:prod:
+    desc: prod の Discord 通知先を作成 (PROD_DISCORD_WEBHOOK_URL 必須、既存値は保持)
+    cmds:
+      - task: omni:prod:kubeconfig
+      - python3 scripts/prod-alert-secret.py
 
   gitops:prod:
     desc: prod専用kubeconfigでArgo CDをbootstrapしてGitOpsを開始

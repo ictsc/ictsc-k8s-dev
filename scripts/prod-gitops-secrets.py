@@ -1,56 +1,131 @@
 #!/usr/bin/env python3
-"""Seed prod GitOps credentials without writing secret values to disk or stdout."""
+"""Preserve prod Secrets or recover missing ones from a prod-only bundle."""
+import argparse
 import base64
 import json
+import os
 from pathlib import Path
-import secrets
+import stat
 import subprocess
 
 ROOT = Path(__file__).resolve().parent.parent
-DEV = ['kubectl', '--kubeconfig', str(ROOT / '.kube/config'), '--context', 'admin@ictsc-dev']
-PROD = ['kubectl', '--kubeconfig', str(ROOT / '.kube/prod')]
+PROD = ['kubectl', '--kubeconfig', str(ROOT / '.kube/prod'), '--request-timeout=30s']
+REQUIRED = {
+    'argocd/repo-ictsc-k8s-dev': ('type', 'url', 'sshPrivateKey'),
+    'dex/dex-secrets': ('github-client-id', 'github-client-secret', 'oauth2-proxy-client-secret', 'argocd-client-secret', 'grafana-client-secret'),
+    'oauth2-proxy/oidc': ('client-id', 'client-secret', 'cookie-secret'),
+    'argocd/argocd-oidc': ('clientSecret',),
+    'monitoring/grafana-oidc': ('clientSecret',),
+    'monitoring/grafana-admin': ('admin-user', 'admin-password'),
+    'scoreserver/discord-oauth-client': ('client-id', 'client-secret'),
+}
+LABELS = {
+    'argocd/repo-ictsc-k8s-dev': {'argocd.argoproj.io/secret-type': 'repository'},
+    'argocd/argocd-oidc': {'app.kubernetes.io/part-of': 'argocd'},
+}
 
 
-def read(command):
-    return json.loads(subprocess.check_output(command))
+def read(*args):
+    result = subprocess.run(PROD + list(args) + ['-o', 'json'], capture_output=True, text=True)
+    if result.returncode:
+        raise RuntimeError('Kubernetes read failed; check prod credentials and API access')
+    return json.loads(result.stdout) if result.stdout.strip() else None
 
 
-def apply(obj):
-    subprocess.run(PROD + ['apply', '-f', '-'], input=json.dumps(obj).encode(), check=True, stdout=subprocess.DEVNULL)
+def create(obj):
+    # Atomic create protects Secrets concurrently created by another operator.
+    result = subprocess.run(PROD + ['create', '-f', '-'], input=json.dumps(obj), text=True, capture_output=True)
+    if result.returncode:
+        raise RuntimeError('Kubernetes create failed; existing resources were not overwritten')
 
 
-def put(namespace, name, data, labels=None, encoded=False):
-    existing = subprocess.check_output(PROD + ['-n', namespace, 'get', 'secret', name, '--ignore-not-found', '-o', 'name'])
-    if existing:
-        print(f'Preserved {namespace}/{name}')
+def validate_data(key, data):
+    for field in REQUIRED[key]:
+        try:
+            if not base64.b64decode(data[field], validate=True):
+                raise ValueError()
+        except (KeyError, ValueError, TypeError):
+            raise ValueError(f'Invalid or missing key: {key}/{field}') from None
+
+
+def load_bundle(path):
+    fd = os.open(path, os.O_RDONLY | os.O_NOFOLLOW)
+    with os.fdopen(fd) as stream:
+        info = os.fstat(stream.fileno())
+        if not stat.S_ISREG(info.st_mode) or info.st_mode & 0o077 or info.st_uid != os.getuid():
+            raise ValueError('Recovery bundle must be an owner-only regular file (mode 600)')
+        bundle = json.load(stream)
+    if bundle.get('version') != 1 or bundle.get('environment') != 'prod':
+        raise ValueError('Expected a version 1 prod recovery bundle')
+    return bundle['secrets']
+
+
+def check_oidc_consistency(data):
+    dex = data['dex/dex-secrets']
+    for source, target in [('oauth2-proxy-client-secret', 'oauth2-proxy/oidc'),
+                           ('argocd-client-secret', 'argocd/argocd-oidc'),
+                           ('grafana-client-secret', 'monitoring/grafana-oidc')]:
+        field = 'client-secret' if target == 'oauth2-proxy/oidc' else 'clientSecret'
+        if dex[source] != data[target][field]:
+            raise ValueError(f'OIDC credentials disagree: dex/dex-secrets and {target}')
+
+
+def reconcile(bundle_path=None, export_path=None):
+    nodes = read('get', 'nodes')['items']
+    if not nodes or not all(n['metadata']['name'].startswith('ictsc-prod-') for n in nodes):
+        raise ValueError('Expected prod nodes; refusing to access credentials')
+    current = {}
+    for key in REQUIRED:
+        namespace, name = key.split('/')
+        obj = read('-n', namespace, 'get', 'secret', name, '--ignore-not-found')
+        if obj:
+            validate_data(key, obj.get('data', {}))
+            current[key] = obj['data']
+    missing = REQUIRED.keys() - current.keys()
+    if export_path:
+        if missing:
+            raise ValueError('Cannot export incomplete prod credentials: ' + ', '.join(sorted(missing)))
+        check_oidc_consistency(current)
+        fd = os.open(export_path, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o600)
+        with os.fdopen(fd, 'w') as stream:
+            json.dump({'version': 1, 'environment': 'prod', 'secrets': current}, stream)
+        print('Exported owner-only prod recovery bundle; store it in the approved encrypted vault')
         return
-    apply({'apiVersion': 'v1', 'kind': 'Secret', 'type': 'Opaque',
-           'metadata': {'name': name, 'namespace': namespace, 'labels': labels or {}},
-           'data' if encoded else 'stringData': data})
-    print(f'Created {namespace}/{name}')
+    if not missing:
+        check_oidc_consistency(current)
+        print('Preserved all prod GitOps Secrets; no dev access or writes')
+        return
+    if not bundle_path:
+        raise ValueError('Missing prod Secrets: ' + ', '.join(sorted(missing)) + '; set PROD_GITOPS_SECRETS_FILE')
+    bundle = load_bundle(bundle_path)
+    for key in missing:
+        validate_data(key, bundle.get(key, {}))
+    desired = dict(current)
+    desired.update({key: bundle[key] for key in missing})
+    # Validate all credentials before any write, including partially rotated OIDC.
+    check_oidc_consistency(desired)
+    for namespace in sorted({key.split('/')[0] for key in missing}):
+        if not read('get', 'namespace', namespace, '--ignore-not-found'):
+            create({'apiVersion': 'v1', 'kind': 'Namespace', 'metadata': {'name': namespace}})
+    for key in sorted(missing):
+        namespace, name = key.split('/')
+        create({'apiVersion': 'v1', 'kind': 'Secret', 'type': 'Opaque',
+                'metadata': {'name': name, 'namespace': namespace, 'labels': LABELS.get(key, {})},
+                'data': desired[key]})
+        print(f'Restored {key}')
 
 
-nodes = read(PROD + ['get', 'nodes', '-o', 'json'])['items']
-assert len(nodes) == 6 and all(n['metadata']['name'].startswith('ictsc-prod-') for n in nodes), 'Expected prod nodes'
-for namespace in ['argocd', 'dex', 'oauth2-proxy', 'monitoring', 'scoreserver']:
-    apply({'apiVersion': 'v1', 'kind': 'Namespace', 'metadata': {'name': namespace}})
+def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('--export', metavar='NEW_FILE', help='Export current prod credentials to a new mode-600 file')
+    args = parser.parse_args()
+    try:
+        reconcile(os.environ.get('PROD_GITOPS_SECRETS_FILE'), args.export)
+    except (OSError, ValueError, RuntimeError, KeyError) as error:
+        if isinstance(error, json.JSONDecodeError):
+            raise SystemExit('Invalid recovery bundle JSON') from None
+        raise SystemExit(str(error)) from None
 
-repo = read(DEV + ['-n', 'argocd', 'get', 'secret', 'repo-ictsc-k8s-dev', '-o', 'json'])
-put('argocd', 'repo-ictsc-k8s-dev', repo['data'], {'argocd.argoproj.io/secret-type': 'repository'}, encoded=True)
-existing = read(PROD + ['-n', 'dex', 'get', 'secret', 'dex-secrets', '--ignore-not-found', '-o', 'json']) if subprocess.check_output(PROD + ['-n', 'dex', 'get', 'secret', 'dex-secrets', '--ignore-not-found', '-o', 'name']) else None
-if existing:
-    dex = {k: base64.b64decode(v).decode() for k, v in existing['data'].items()}
-else:
-    source = read(DEV + ['-n', 'dex', 'get', 'secret', 'dex-secrets', '-o', 'json'])['data']
-    dex = {k: base64.b64decode(source[k]).decode() for k in ['github-client-id', 'github-client-secret']}
-    dex.update({k: secrets.token_urlsafe(32) for k in ['oauth2-proxy-client-secret', 'argocd-client-secret', 'grafana-client-secret']})
-put('dex', 'dex-secrets', dex)
-put('oauth2-proxy', 'oidc', {'client-id': 'oauth2-proxy', 'client-secret': dex['oauth2-proxy-client-secret'], 'cookie-secret': secrets.token_urlsafe(32)})
-put('argocd', 'argocd-oidc', {'clientSecret': dex['argocd-client-secret']}, {'app.kubernetes.io/part-of': 'argocd'})
-put('monitoring', 'grafana-oidc', {'clientSecret': dex['grafana-client-secret']})
-put('monitoring', 'grafana-admin', {'admin-user': 'admin', 'admin-password': secrets.token_urlsafe(32)})
 
-# Regalia reuses the approved Discord App; callbacks include the prod hostname.
-if not subprocess.check_output(PROD + ['-n', 'scoreserver', 'get', 'secret', 'discord-oauth-client', '--ignore-not-found', '-o', 'name']):
-    discord = read(DEV + ['-n', 'scoreserver', 'get', 'secret', 'discord-oauth-client', '-o', 'json'])
-    put('scoreserver', 'discord-oauth-client', {k: discord['data'][k] for k in ['client-id', 'client-secret']}, encoded=True)
+if __name__ == '__main__':
+    main()
