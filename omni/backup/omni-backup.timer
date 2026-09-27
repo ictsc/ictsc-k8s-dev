@@ -1,0 +1,11 @@
+[Unit]
+Description=Hourly Omni recovery backup
+
+[Timer]
+OnCalendar=hourly
+RandomizedDelaySec=5min
+Persistent=true
+Unit=omni-backup.service
+
+[Install]
+WantedBy=timers.target

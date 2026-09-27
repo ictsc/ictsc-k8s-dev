@@ -156,4 +156,7 @@ Machine Classの設定例、IP poolの非重複要件、事前登録が必要な
 - `/opt/omni/dex.yaml`
 - `/etc/letsencrypt`
 
-etcdの整合したバックアップ手順と復元テストは、dev import前に別途確認する。
+etcd API snapshotとSQLite Online Backup APIを使う取得スクリプト、暗号化外部保存、
+隔離復元検査、timerの導入手順は [backup/README.md](backup/README.md) を参照。
+実機導入・外部保管・Omniログインを含む復元演習は未完了。VMスナップショットの
+対象を列挙しただけで復旧可能と判断しない。

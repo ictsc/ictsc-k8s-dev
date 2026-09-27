@@ -1,0 +1,12 @@
+[Unit]
+Description=Encrypted off-host backup of Omni databases and recovery configuration
+After=network-online.target omni.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+EnvironmentFile=/etc/omni-backup.env
+ExecStart=/usr/local/sbin/omni-backup
+TimeoutStartSec=30min
+UMask=0077
+PrivateTmp=true
