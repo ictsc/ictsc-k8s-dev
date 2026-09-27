@@ -1,5 +1,5 @@
 # Alertmanager の通知先。webhook URL は Secret alertmanager-discord から読む
-# (task alert-secrets が .envrc の DISCORD_WEBHOOK_URL から作る)。
+# (task alert-secrets:prod が PROD_DISCORD_WEBHOOK_URL から作る)。
 #
 # values.yaml 側の config には書けない。operator の設定パーサは
 # discord_configs.webhook_url_file を知らず、Alertmanager の起動前に弾かれる。
