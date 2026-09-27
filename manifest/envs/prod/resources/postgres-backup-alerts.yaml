@@ -1,0 +1,33 @@
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: postgres-backups
+  namespace: scoreserver
+  labels:
+    release: kube-prometheus-stack
+spec:
+  groups:
+    - name: postgres-backups
+      rules:
+        - alert: PostgresBackupStale
+          expr: |
+            time() - max(barman_cloud_cloudnative_pg_io_last_available_backup_timestamp{namespace="scoreserver"}) > 93600
+          for: 15m
+          labels:
+            severity: critical
+          annotations:
+            summary: PostgreSQL のバックアップが26時間以上更新されていません
+        - alert: PostgresBackupMetricsMissing
+          expr: absent(barman_cloud_cloudnative_pg_io_last_available_backup_timestamp{namespace="scoreserver"})
+          for: 30m
+          labels:
+            severity: warning
+          annotations:
+            summary: PostgreSQL バックアップの監視データがありません
+        - alert: PostgresWALArchiveFailing
+          expr: increase(cnpg_pg_stat_archiver_failed_count{namespace="scoreserver"}[15m]) > 0
+          for: 5m
+          labels:
+            severity: critical
+          annotations:
+            summary: PostgreSQL の WAL アーカイブに失敗しています

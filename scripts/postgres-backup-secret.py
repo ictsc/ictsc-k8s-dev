@@ -19,11 +19,12 @@ def main():
     nodes = json.loads(subprocess.check_output(kube + ['get', 'nodes', '-o', 'json']))['items']
     if not nodes or not all(n['metadata']['name'].startswith(f'ictsc-{args.environment}-') for n in nodes):
         raise SystemExit('Unexpected target cluster')
-    result = subprocess.run(['bash', str(ROOT / 'scripts/terraform-env.sh'), args.environment,
-                             'output', '-json', 'postgres_backup_credentials'], capture_output=True, text=True)
-    if result.returncode:
-        raise SystemExit('Cannot read backup credentials; verify project access and apply the backup resources first')
-    data = json.loads(result.stdout)
+    # Secret Manager is the recovery source, independent of cluster state.
+    import importlib.util
+    spec = importlib.util.spec_from_file_location('recovery', ROOT / 'scripts/recovery-secrets.py')
+    recovery = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(recovery)
+    data = json.loads(recovery.Vault().get(args.environment + '-postgres-s3'))
     if not data or any(not data.get(key) for key in ('ACCESS_KEY_ID', 'ACCESS_SECRET_KEY')):
         raise SystemExit('Backup credentials are incomplete')
     secret = {'apiVersion': 'v1', 'kind': 'Secret', 'type': 'Opaque',

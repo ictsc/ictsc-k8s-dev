@@ -17,3 +17,6 @@
 
 /.vscode/*
 !/.vscode/extensions.json
+
+# Python verification caches
+__pycache__/

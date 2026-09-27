@@ -1,13 +1,14 @@
 # PostgreSQL backup / recovery
 
-Issue #12。dev は Barman Cloud plugin chart 0.7.1 (plugin 0.14.0) と
-CNPG 1.30 / cluster chart 0.8.1 を使用する。prod は Object Storage API が403のため、
-保存先の決定・権限整備が終わるまで有効化しない。失敗する保存先をDBへ設定しない。
+Issue #12。dev/prod は Barman Cloud plugin chart 0.7.1 (plugin 0.14.0) と
+CNPG 1.30 / cluster chart 0.8.1 を使用する。prod の保存先も共通リソースアカウントに
+置き、クラスタのAPIキーとバックアップ用キーを分離する。
 
 ## 保存と目標
 
 - dev/prod は専用バケット・専用キーで分離する。Terraform backend 用キーは使わない。
 - dev: `s3://ictsc-void-k8s-dev-postgres-backups/cnpg-v1`。
+- prod: `s3://ictsc-void-k8s-prod-postgres-backups/cnpg-v1`。
 - 毎日03:00 JSTにベースバックアップ、WAL は継続保存、保持期間は14日。
 - 目標RPOは5分（archive_timeout=300s）。転送障害中は保証されない。
 - 目標RTOは60分。実測値は復元検証後に記録する。これは合意済みSLAではない。
@@ -27,11 +28,35 @@ task postgres-backup-secrets ENV=dev
 通常のインフラ更新では全体planも確認する。
 `postgres_backup_storage` 出力の endpoint/bucket と環境別 values が一致することを確認し、
 その後にマニフェストをpushする。Secret値はCLI引数・ファイル・ログへ出さない。
-資格情報はremote Terraform stateから再取得できる。stateとその認証情報の復旧も必要。
+資格情報はさくらシークレットマネージャの復旧用保管庫に保存する。
+`postgres-backup-secret.py` は保管庫から読み、値をログ・一時ファイルへ出さずクラスタへ渡す。
 
-prodの導入時は保存先を決定したうえで `postgres_backup_enabled.prod`、
-prodのBarman Application、DB用backup-valuesと保存先、監視ルールを有効化する。
-共通リソース側に保存する場合は先にTerraformの所有stateを決め、prodのAPIキーを流用しない。
+共通基盤の管理は `bash scripts/backup-infra.sh init|plan|apply`。
+専用の remote state `backups/terraform.tfstate` (default workspace) でprod DB/Omniの
+バケット・個別権限・KMS・復旧保管庫を管理する。dev DBは既存dev stateが所有する。
+共通リソースアカウントのIDをAPIで照合してから実行し、prodアカウントを流用しない。
+
+```bash
+python3 scripts/recovery-secrets.py # 既存値が異なる場合は上書きせず停止
+python3 scripts/postgres-backup-secret.py dev
+python3 scripts/postgres-backup-secret.py prod
+```
+
+保管庫 `ictsc-recovery-secrets` の格納名:
+`dev-postgres-s3`, `prod-postgres-s3`, `omni-restic`, `prod-gitops-v1`, `prod-discord-webhook`。
+APIキーには対象KMS・保管庫へのアクセス権が必要。保管庫IDは
+`backups/terraform` の `storage.vault_id` で確認できる。
+共通アカウントのAPI認証とTerraform backendへのアクセスはクラスタ外で維持すること。
+DB用S3キーには自身のバケットだけを許可し、保管庫のAPIキーをDBへ渡さない。
+
+prod GitOpsの復旧:
+```bash
+python3 scripts/recovery-secrets.py --export-prod /secure/new-prod-bundle.json
+PROD_GITOPS_SECRETS_FILE=/secure/new-prod-bundle.json python3 scripts/prod-gitops-secrets.py
+# 復旧確認後に /secure/new-prod-bundle.json を削除
+```
+出力は新規mode600ファイルのみ。ベース64は暗号化ではないため放置しない。
+キーをローテーションした際は、既存保管値と運用値の差分を確認して保管庫も更新する。
 
 ## 検証と復旧
 
