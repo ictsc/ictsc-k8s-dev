@@ -3,3 +3,6 @@ cluster:
   storage:
     storageClass: longhorn-single-replica
     resizeInUseVolumes: false
+backups:
+  endpointURL: https://s3.isk01.sakurastorage.jp
+  destinationPath: s3://ictsc-void-k8s-dev-postgres-backups/cnpg-v1

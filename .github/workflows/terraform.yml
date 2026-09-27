@@ -6,6 +6,7 @@ on:
   pull_request:
     paths:
       - "terraform/**"
+      - "backups/terraform/**"
       - "talos/**"
       - "Taskfile.yaml"
       - "aqua.yaml"
@@ -46,6 +47,14 @@ jobs:
           terraform fmt -check -diff
           terraform validate
           tflint
+      - name: Validate shared backup infrastructure
+        working-directory: backups/terraform
+        env:
+          TF_WORKSPACE: default
+        run: |
+          terraform init -backend=false -input=false
+          terraform fmt -check -diff
+          terraform validate
 
   terraform:
     if: github.event_name == 'workflow_dispatch'

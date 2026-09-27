@@ -1,9 +1,11 @@
 resources:
   - ../../base
+  - ../../base/infra/plugin-barman-cloud
   - ../../base/infra/external-secrets
   - ./resources/infra-secrets.yaml
   - ./resources/regalia-auth.yaml
   - ./resources/regalia-openapi-database.yaml
+  - ./resources/postgres-backup-alerts.yaml
   - ./resources/cilium-lb-ip-pool.yaml
   - ./resources/cilium-l2-announcement.yaml
   - ./resources/gateway.yaml
@@ -94,6 +96,9 @@ patches:
         value: $values/manifest/envs/dev/values/oauth2-proxy.yaml
   - target: {kind: Application, name: regalia-postgres}
     patch: |-
+      - op: add
+        path: /spec/sources/0/helm/valueFiles/-
+        value: $values/manifest/base/apps/regalia/postgres/backup-values.yaml
       - op: add
         path: /spec/sources/0/helm/valueFiles/-
         value: $values/manifest/envs/dev/values/regalia-postgres.yaml
