@@ -38,6 +38,24 @@ Webhookの値はGitへ保存しない。Longhorn容量・degraded/faultedの4ル
 送信先切替後にDiscord通知カウンターが16→17へ増加し、失敗カウンターは全理由0。
 復旧中に停止したroot／kube-prometheus-stackのArgo CD自動同期は元へ戻した。
 
+## 2026-10-01 の DB PVC 拡張
+
+復旧後の `CNPGClusterLowDiskSpaceWarning` は、DB PVC内の使用率が70%を5分超えた警告。
+各PVCは1Giで72〜75%使用、WALは約600MiB（`wal_keep_size=512MB`）、DBデータは約39MiBだった。
+物理ディスクには空きがあり、ユーザー承認のもとprodのDB PVCだけを2Giへ拡張した。
+設定は `manifest/envs/prod/values/regalia-postgres.yaml` の `cluster.storage` に保持する。
+
+最初の拡張はLonghornの予約容量制限で拒否された。worker-3にDB replicaが2つあり、
+追加1Giで `StorageScheduled` が `(StorageMaximum - StorageReserved)` を超えていた。
+物理空きと予約可能容量は別なので、物理空きだけで拡張可否を判断しない。
+postgres-1のreplicaを安全なevictionでworker-3からworker-1へ移し、新replicaのRW・healthyを確認。
+3ノードの予約容量を均等化してからCNPGが既存PVCを拡張した。予約率・over-provisioningは変更していない。
+
+全3PVCのcapacity=2Gi、ファイルシステム使用率36〜38%・空き約1.3GiBを確認。
+`FileSystemResizePending` はkubeletによるオンライン拡張で解消し、Pod再起動やPVC削除は不要だった。
+DBは3/3 Ready、primaryはpostgres-2のまま、standby 2台のstreamingとGitOps Synced/Healthyを確認した。
+将来の拡張時も、先にreplica配置・予約容量・実空きを確認する。
+
 ## 2026-10-01 の prod 障害
 
 worker 1/3 の専用 SSD (各20 GiB) が満杯になり、Prometheus の10 GiBボリューム
