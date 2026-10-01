@@ -105,6 +105,9 @@ v1.10.6にはこの拒否を許容する
 workerのdrainはLonghornの最後の正常replicaでも停止し得る。
 dev/prodのHelm valuesでは `nodeDrainPolicy: block-for-eviction-if-contains-last-replica`
 を指定し、別ノードへのreplica退避完了まで待ってからdrainを許可する。
+専用データディスクは20%を予約する。既存ディスクの `spec.disks.*.storageReserved`
+はHelmの既定値変更では更新されないため、2026-10-01にdevの既存3ディスクも
+実空き容量を確認して20%へ揃えた。
 移動先の容量が不足した場合は保護を維持して停止するため、PDB削除や強制再起動で
 回避せず、Longhornの配置・容量・再構築状況を確認する。
 

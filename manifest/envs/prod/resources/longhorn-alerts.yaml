@@ -1,0 +1,41 @@
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: longhorn-storage
+  namespace: monitoring
+  labels:
+    release: kube-prometheus-stack
+spec:
+  groups:
+    - name: longhorn.storage
+      rules:
+        - alert: LonghornDiskSpaceLow
+          expr: longhorn_disk_usage_bytes / longhorn_disk_capacity_bytes > 0.75
+          for: 5m
+          labels:
+            severity: warning
+          annotations:
+            summary: 'Longhorn {{ $labels.node }} のディスク使用率が75%を超えています'
+            description: '更新・replica再構築前に空き容量とsystem snapshotを確認してください。'
+        - alert: LonghornDiskSpaceCritical
+          expr: longhorn_disk_usage_bytes / longhorn_disk_capacity_bytes > 0.90
+          for: 1m
+          labels:
+            severity: critical
+          annotations:
+            summary: 'Longhorn {{ $labels.node }} のディスク使用率が90%を超えています'
+            description: '書き込み停止の危険があります。新たな更新を止め、容量を確保してください。'
+        - alert: LonghornVolumeDegraded
+          expr: longhorn_volume_robustness{state="degraded"} == 1
+          for: 10m
+          labels:
+            severity: warning
+          annotations:
+            summary: 'Longhorn {{ $labels.pvc_namespace }}/{{ $labels.pvc }} のreplicaが不足しています'
+        - alert: LonghornVolumeFaulted
+          expr: longhorn_volume_robustness{state="faulted"} == 1
+          for: 1m
+          labels:
+            severity: critical
+          annotations:
+            summary: 'Longhorn {{ $labels.pvc_namespace }}/{{ $labels.pvc }} がfaultedです'

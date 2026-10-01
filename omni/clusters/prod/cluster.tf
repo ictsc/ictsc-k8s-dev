@@ -30,7 +30,7 @@ variable "external_prefix" {
 resource "omni_cluster" "prod" {
   name               = "ictsc-prod"
   talos_version      = "1.13.10"
-  kubernetes_version = "1.36.4"
+  kubernetes_version = "1.36.5"
   backup_interval    = "1h"
   lifecycle {
     prevent_destroy = true

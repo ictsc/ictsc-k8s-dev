@@ -25,7 +25,7 @@ resource "sakura_disk" "worker_node" {
 }
 
 # Longhorn のレプリカデータ専用。OS ディスクと障害・容量を分離する。
-# dev のみに作成し、worker へ2本目の virtio ディスクとして接続する。
+# dev/prod の worker へ2本目の virtio ディスクとして接続する。
 resource "sakura_disk" "longhorn" {
   count = local.longhorn_enabled ? local.worker_node_count : 0
 
@@ -34,6 +34,12 @@ resource "sakura_disk" "longhorn" {
   plan      = "ssd"
   connector = "virtio"
   size      = var.longhorn_disk_size[local.env]
+
+  # size の変更は既存データを消す replacement になる。容量拡張は旧ディスクを
+  # 保持してコピー・切替する。手順は docs/longhorn-capacity.md を参照。
+  lifecycle {
+    prevent_destroy = true
+  }
 
   timeouts = {
     create = "1h"
