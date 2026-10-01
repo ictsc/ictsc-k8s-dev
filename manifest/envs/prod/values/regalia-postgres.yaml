@@ -2,7 +2,9 @@ cluster:
   instances: 3
   storage:
     storageClass: longhorn-single-replica
-    resizeInUseVolumes: false
+    # WAL保持分を含めた余裕を確保し、既存PVCをデータを保持して拡張する。
+    size: 2Gi
+    resizeInUseVolumes: true
 
 backups:
   endpointURL: https://s3.isk01.sakurastorage.jp
