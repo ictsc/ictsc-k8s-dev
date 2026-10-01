@@ -63,6 +63,8 @@ Talos API（50000/tcp）は踏み台限定だが、CPのKubernetes API（6443/tc
 prodの通常のkubectlはOmni API proxyを使用し、上記の予約API VIPが稼働しているとは仮定しない。
 経路と実測結果は [API公開方針](docs/api-exposure.md) を参照。
 
+複数拠点への worker 配置については [Omni / KubeSpan 設計案](docs/multi-site-kubernetes.md) を参照（未適用）。
+
 ### Longhorn (dev)
 
 dev の各 worker に20GiB SSDを1本追加し、Longhorn v1.12.1のV1 Data Engineで
