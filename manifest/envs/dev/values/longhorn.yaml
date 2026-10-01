@@ -18,6 +18,8 @@ persistence:
   dataEngine: v1
 
 defaultSettings:
+  # 単一replicaの退避完了を待ってからdrainし、Talosのローリング更新を進める。
+  nodeDrainPolicy: block-for-eviction-if-contains-last-replica
   defaultDataPath: /var/mnt/longhorn
   defaultReplicaCount: '{"v1":"3","v2":"3"}'
   systemManagedComponentsNodeSelector: node.kubernetes.io/role:worker

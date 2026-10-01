@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-version="${OMNI_VERSION:-v1.8.0}"
+version="${OMNI_VERSION:-v1.10.6}"
 root="$(cd "$(dirname "$0")/../.." && pwd)"
 out="${root}/bin/omnictl"
 

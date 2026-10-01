@@ -18,6 +18,8 @@ persistence:
   dataEngine: v1
 
 defaultSettings:
+  # 単一replicaの退避完了を待ってからdrainし、Talosのローリング更新を進める。
+  nodeDrainPolicy: block-for-eviction-if-contains-last-replica
   # Dedicated data disks: retain 20% headroom without over-provisioning.
   storageReservedPercentageForDefaultDisk: 20
   defaultDataPath: /var/mnt/longhorn

@@ -6,7 +6,7 @@ set -euo pipefail
 : "${OMNI_PUBLIC_IP:?OMNI_PUBLIC_IP is required}"
 : "${OMNI_ADMIN_EMAIL:?OMNI_ADMIN_EMAIL is required}"
 : "${ACME_EMAIL:?ACME_EMAIL is required}"
-: "${OMNI_VERSION:=v1.8.0}"
+: "${OMNI_VERSION:=v1.10.6}"
 
 if [ "$(id -u)" -ne 0 ]; then
   echo "ERROR: rootで実行してください" >&2

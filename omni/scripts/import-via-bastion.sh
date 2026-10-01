@@ -2,7 +2,7 @@
 set -euo pipefail
 
 root="$(cd "$(dirname "$0")/../.." && pwd)"
-omni_version="${OMNI_VERSION:-v1.8.0}"
+omni_version="${OMNI_VERSION:-v1.10.6}"
 mode="${1:---dry-run}"
 
 case "${mode}" in

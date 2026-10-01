@@ -1,11 +1,11 @@
 # Self-hosted Omni
 
-`ictsc-dev` と将来の `ictsc-prod` を管理するOmniを、Kubernetesクラスタの外にある
+`ictsc-dev` と `ictsc-prod` を管理するOmniを、Kubernetesクラスタの外にある
 専用Ubuntu VMで動かす。Omniが停止しても既存クラスタは稼働を続ける。
 
 ## 構成
 
-- Omni `v1.8.0` + embedded etcd
+- Omni `v1.10.6` + embedded etcd
 - Dex `v2.41.1`（初回はstatic password。GitHub連携は稼働確認後に追加）
 - 2 vCPU / 8 GiB / 250 GiB SSD
 - `omni.ictsc.net` / `auth.omni.ictsc.net`
@@ -64,6 +64,49 @@ task configure-omni-github-sso
 GitHub Appにはcallback URLとして
 `https://auth.omni.ictsc.net:5556/callback`を登録しておく。ローカルadminログインは
 復旧経路として残る。
+
+## 既存Omniの更新
+
+`ssh ubuntu@omni.ictsc.net` でVMに接続し、イメージを取得してから
+直前バックアップを実行する。バックアップ失敗時は更新を進めない。
+
+```bash
+sudo docker pull ghcr.io/siderolabs/omni:v1.10.6
+sudo systemctl start omni-backup.service
+sudo systemctl show omni-backup.service -p Result
+sudo cat /var/lib/omni-backup/last-success
+```
+
+`Result=success` と今回の成功時刻を確認後、`/opt/omni/omni.env` を
+権限を保持して退避し、`sudoedit /opt/omni/omni.env` で
+`OMNI_VERSION=v1.10.6` に変更する。他の認証値は表示・変更しない。
+
+```bash
+sudo cp -p /opt/omni/omni.env /opt/omni/omni.env.before-upgrade-$(date -u +%Y%m%dT%H%M%SZ)
+sudoedit /opt/omni/omni.env
+cd /opt/omni
+sudo docker compose --env-file omni.env config --quiet
+sudo docker compose --env-file omni.env up -d --no-deps omni
+sudo docker inspect omni-omni-1 --format '{{.Config.Image}} {{.State.Status}}'
+```
+
+Omni再起動中はUI・API proxyが一時停止する。起動後はdev/prod両方の
+`TalosUpgradeStatus`、`ClusterStatus` とKubernetesのノード・Podを確認する。
+保留中の更新がある場合はノードのローリング更新も再開する。
+リポジトリの `Taskfile.yaml` と各スクリプトの既定バージョンを揃え、
+`task fetch-omnictl` でチェックサム検証付きのCLIを取得する。
+
+v1.8.0はTalos v1.13.10のMETAキー保護により、設定反映時に
+`meta key is not writeable via the API` で停止する。
+v1.10.6にはこの拒否を許容する
+[公式修正](https://github.com/siderolabs/omni/commit/8385d3a275464c94c292da77a918a6fb5590e67b)
+が含まれる。更新ロックの手動削除やノードの作り直しは不要。
+
+workerのdrainはLonghornの最後の正常replicaでも停止し得る。
+dev/prodのHelm valuesでは `nodeDrainPolicy: block-for-eviction-if-contains-last-replica`
+を指定し、別ノードへのreplica退避完了まで待ってからdrainを許可する。
+移動先の容量が不足した場合は保護を維持して停止するため、PDB削除や強制再起動で
+回避せず、Longhornの配置・容量・再構築状況を確認する。
 
 ## 4. omnictlを準備
 
