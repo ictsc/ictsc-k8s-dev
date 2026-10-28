@@ -5,6 +5,9 @@ prometheus:
       volumeClaimTemplate:
         spec:
           storageClassName: longhorn
+          resources:
+            requests:
+              storage: 20Gi
 
 alertmanager:
   alertmanagerSpec:
