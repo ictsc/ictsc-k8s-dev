@@ -1,0 +1,21 @@
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: opentelemetry-collector-export
+  namespace: monitoring
+  labels:
+    release: kube-prometheus-stack
+spec:
+  groups:
+    - name: opentelemetry-collector-export
+      rules:
+        - alert: OpenTelemetryCollectorExportFailed
+          expr: |
+            sum by (exporter) (rate(otelcol_exporter_send_failed_spans[5m])) > 0
+            or sum by (exporter) (rate(otelcol_exporter_send_failed_metric_points[5m])) > 0
+            or sum by (exporter) (rate(otelcol_exporter_send_failed_log_records[5m])) > 0
+          for: 10m
+          labels:
+            severity: warning
+          annotations:
+            summary: OpenTelemetry Collector のエクスポートに失敗しています

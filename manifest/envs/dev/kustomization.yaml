@@ -16,6 +16,9 @@ resources:
   - ./resources/rbac-oidc.yaml
   - ./resources/httproutes.yaml
   - ./resources/longhorn.yaml
+  - ./resources/tempo.yaml
+  - ./resources/opentelemetry-collector.yaml
+  - ./resources/opentelemetry-alerts.yaml
 
 patches:
   # Preview branch is pinned explicitly; do not follow main images.
@@ -61,6 +64,9 @@ patches:
       - op: add
         path: /spec/sources/0/helm/valueFiles/-
         value: $values/manifest/envs/dev/values/kube-prometheus-stack.yaml
+      - op: add
+        path: /spec/sources/0/helm/valueFiles/-
+        value: $values/manifest/envs/dev/values/kube-prometheus-stack-observability.yaml
       - op: add
         path: /spec/sources/0/helm/valueFiles/-
         value: $values/manifest/envs/dev/values/kube-prometheus-stack-storage.yaml
