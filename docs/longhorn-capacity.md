@@ -1,9 +1,36 @@
 # Longhorn の容量不足とディスク移行
 
-## 現在の方針
+## 2026-10-28 の dev 拡張
 
-2026-10-01のユーザー指定により、物理ディスクは既存の20 GiBを維持する。
-有料ディスクの追加・拡張は実施しない。以下の拡張案は未採用の検討記録。
+dev の Longhorn 専用 SSD は、容量不足に対するユーザー承認（各ディスクを
+従来の2〜3倍まで拡張可）を受け、worker 1/2/3 とも20 GiBから40 GiBへ
+コピー・切替した。OSディスクは変更していない。旧20 GiBディスクは各workerから
+切り離してTerraform管理下で保持する。旧ディスク保持中の確保容量は各workerで
+合計60 GiBとなり、旧構成の3倍。削除は別途、データとバックアップを確認して判断する。
+
+対応したPRは [#29](https://github.com/ictsc/ictsc-k8s-dev/pull/29)、
+[#30](https://github.com/ictsc/ictsc-k8s-dev/pull/30)、
+[#31](https://github.com/ictsc/ictsc-k8s-dev/pull/31)、
+[#32](https://github.com/ictsc/ictsc-k8s-dev/pull/32)、
+[#33](https://github.com/ictsc/ictsc-k8s-dev/pull/33)、
+[#34](https://github.com/ictsc/ictsc-k8s-dev/pull/34)。Prometheus PVCは
+20 GiBへ拡張した。切替時は1台ずつcordon/drain・正常停止し、Sakura APIで
+OSディスクIDと新データディスクIDを確認してから起動した。TalosのXFSとLonghornが
+各ディスク約40 GiBを認識し、3 workerがReadyに復帰した。
+切替後、devのLonghorn全8 volumeがhealthy、PostgreSQLが3/3 Ready、
+Prometheus・Grafana・Tempo・OpenTelemetry CollectorがReady、Argo CD rootと
+各監視ApplicationがSynced/Healthyであることを確認した。
+
+worker 2の停止前、CNPG primaryをworker 1へswitchoverし、PostgreSQLの
+3 PVCのLonghorn replica数をそれぞれ1から2へ変更した。これらは稼働中volumeへの
+直接変更であり、StorageClassの値は変更していない。今後PVCを作り直す場合は
+StorageClassとレプリカ配置を再確認する。クラウドコピーは元ディスクの稼働中に
+作成したため、そのコピーだけを整合済みバックアップとして扱わない。
+
+## 2026-10-01 の prod 方針と復旧記録
+
+2026-10-01時点のprod方針では、物理ディスクは既存の20 GiBを維持する。
+prodの有料ディスク追加・拡張は実施していない。以下の拡張案はprodの未採用検討記録。
 ログは7日、Prometheusのメトリクスは15日・8 GB上限を維持する。
 ユーザー承認のもと、worker 1のOS領域へ停止済みPrometheus replicaをコピーし、
 全7ファイルのバイト単位の一致を確認してからPrometheusのPVCを再作成した。
