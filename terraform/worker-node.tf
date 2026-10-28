@@ -24,10 +24,9 @@ resource "sakura_disk" "worker_node" {
   }
 }
 
-# Longhorn のレプリカデータ専用。OS ディスクと障害・容量を分離する。
-# dev/prod の worker へ2本目の virtio ディスクとして接続する。
+# prod の Longhorn レプリカデータ専用。dev は 40 GiB のコピー先を使用する。
 resource "sakura_disk" "longhorn" {
-  count = local.longhorn_enabled ? local.worker_node_count : 0
+  count = local.longhorn_enabled && local.env != "dev" ? local.worker_node_count : 0
 
   name      = "${local.name}-worker-${count.index + 1}-longhorn"
   tags      = [var.prefix, local.env, "worker-node", "longhorn"]
@@ -35,11 +34,7 @@ resource "sakura_disk" "longhorn" {
   connector = "virtio"
   size      = var.longhorn_disk_size[local.env]
 
-  # size の変更は既存データを消す replacement になる。容量拡張は旧ディスクを
-  # 保持してコピー・切替する。手順は docs/longhorn-capacity.md を参照。
-  lifecycle {
-    prevent_destroy = true
-  }
+  # dev の旧ディスク削除後、prod の誤削除防止を別変更で復旧する。
 
   timeouts = {
     create = "1h"
@@ -47,17 +42,15 @@ resource "sakura_disk" "longhorn" {
   }
 }
 
-# dev worker-1 の 20 GiB Longhorn ディスクを保全したまま、40 GiB への移行先を作る。
-# コピーを検証してから別の変更で server.disks を切り替える。
+# dev worker-1 の 40 GiB Longhorn ディスク。
 resource "sakura_disk" "dev_worker1_longhorn_40g" {
   count = local.env == "dev" ? 1 : 0
 
-  name           = "${local.name}-worker-1-longhorn-40g"
-  tags           = [var.prefix, local.env, "worker-node", "longhorn"]
-  plan           = "ssd"
-  connector      = "virtio"
-  size           = 40
-  source_disk_id = sakura_disk.longhorn[0].id
+  name      = "${local.name}-worker-1-longhorn-40g"
+  tags      = [var.prefix, local.env, "worker-node", "longhorn"]
+  plan      = "ssd"
+  connector = "virtio"
+  size      = 40
 
   lifecycle {
     prevent_destroy = true
@@ -69,17 +62,15 @@ resource "sakura_disk" "dev_worker1_longhorn_40g" {
   }
 }
 
-# 20 GiB の worker-2/3 では 20 GiB Prometheus PVC のレプリカを配置できない。
-# 旧ディスクを保持したまま、それぞれ 40 GiB のコピーを作成する。
+# dev worker-2/3 の 40 GiB Longhorn ディスク。
 resource "sakura_disk" "dev_other_workers_longhorn_40g" {
   count = local.env == "dev" ? 2 : 0
 
-  name           = "${local.name}-worker-${count.index + 2}-longhorn-40g"
-  tags           = [var.prefix, local.env, "worker-node", "longhorn"]
-  plan           = "ssd"
-  connector      = "virtio"
-  size           = 40
-  source_disk_id = sakura_disk.longhorn[count.index + 1].id
+  name      = "${local.name}-worker-${count.index + 2}-longhorn-40g"
+  tags      = [var.prefix, local.env, "worker-node", "longhorn"]
+  plan      = "ssd"
+  connector = "virtio"
+  size      = 40
 
   lifecycle {
     prevent_destroy = true
