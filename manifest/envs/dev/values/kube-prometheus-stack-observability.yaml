@@ -1,0 +1,25 @@
+prometheus:
+  prometheusSpec:
+    enableOTLPReceiver: true
+
+grafana:
+  additionalDataSources:
+    - name: Loki
+      uid: loki
+      type: loki
+      access: proxy
+      url: http://loki-gateway.monitoring.svc.cluster.local
+      isDefault: false
+      jsonData:
+        maxLines: 1000
+    - name: Tempo
+      uid: tempo
+      type: tempo
+      access: proxy
+      url: http://tempo.monitoring.svc.cluster.local:3200
+      jsonData:
+        tracesToLogsV2:
+          datasourceUid: loki
+          filterByTraceID: true
+        serviceMap:
+          datasourceUid: prometheus
