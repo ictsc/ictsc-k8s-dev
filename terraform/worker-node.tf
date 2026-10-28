@@ -69,6 +69,28 @@ resource "sakura_disk" "dev_worker1_longhorn_40g" {
   }
 }
 
+# 20 GiB の worker-2/3 では 20 GiB Prometheus PVC のレプリカを配置できない。
+# 旧ディスクを保持したまま、それぞれ 40 GiB のコピーを作成する。
+resource "sakura_disk" "dev_other_workers_longhorn_40g" {
+  count = local.env == "dev" ? 2 : 0
+
+  name           = "${local.name}-worker-${count.index + 2}-longhorn-40g"
+  tags           = [var.prefix, local.env, "worker-node", "longhorn"]
+  plan           = "ssd"
+  connector      = "virtio"
+  size           = 40
+  source_disk_id = sakura_disk.longhorn[count.index + 1].id
+
+  lifecycle {
+    prevent_destroy = true
+  }
+
+  timeouts = {
+    create = "1h"
+    delete = "1h"
+  }
+}
+
 resource "sakura_server" "worker_node" {
   count = local.worker_node_count
 
