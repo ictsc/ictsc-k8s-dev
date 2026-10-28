@@ -78,7 +78,11 @@ resource "sakura_server" "worker_node" {
   memory = var.worker_node_mem[local.env]
   disks = concat(
     [sakura_disk.worker_node[count.index].id],
-    local.longhorn_enabled ? [sakura_disk.longhorn[count.index].id] : [],
+    local.longhorn_enabled ? [
+      local.env == "dev" && count.index == 0
+      ? sakura_disk.dev_worker1_longhorn_40g[0].id
+      : sakura_disk.longhorn[count.index].id
+    ] : [],
   )
 
   cdrom_id         = sakura_cdrom.node_config["${local.name}-worker-${count.index + 1}"].id
