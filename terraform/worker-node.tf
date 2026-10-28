@@ -47,6 +47,28 @@ resource "sakura_disk" "longhorn" {
   }
 }
 
+# dev worker-1 の 20 GiB Longhorn ディスクを保全したまま、40 GiB への移行先を作る。
+# コピーを検証してから別の変更で server.disks を切り替える。
+resource "sakura_disk" "dev_worker1_longhorn_40g" {
+  count = local.env == "dev" ? 1 : 0
+
+  name           = "${local.name}-worker-1-longhorn-40g"
+  tags           = [var.prefix, local.env, "worker-node", "longhorn"]
+  plan           = "ssd"
+  connector      = "virtio"
+  size           = 40
+  source_disk_id = sakura_disk.longhorn[0].id
+
+  lifecycle {
+    prevent_destroy = true
+  }
+
+  timeouts = {
+    create = "1h"
+    delete = "1h"
+  }
+}
+
 resource "sakura_server" "worker_node" {
   count = local.worker_node_count
 
