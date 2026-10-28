@@ -101,7 +101,7 @@ resource "sakura_server" "worker_node" {
   disks = concat(
     [sakura_disk.worker_node[count.index].id],
     local.longhorn_enabled ? [
-      local.env == "dev" && count.index == 2 ? sakura_disk.dev_other_workers_longhorn_40g[1].id : (
+      local.env == "dev" && count.index > 0 ? sakura_disk.dev_other_workers_longhorn_40g[count.index - 1].id : (
         local.env == "dev" && count.index == 0 ? sakura_disk.dev_worker1_longhorn_40g[0].id : sakura_disk.longhorn[count.index].id
       )
     ] : [],
