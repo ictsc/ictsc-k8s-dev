@@ -4,9 +4,11 @@
 
 dev の Longhorn 専用 SSD は、容量不足に対するユーザー承認（各ディスクを
 従来の2〜3倍まで拡張可）を受け、worker 1/2/3 とも20 GiBから40 GiBへ
-コピー・切替した。OSディスクは変更していない。旧20 GiBディスクは各workerから
-切り離してTerraform管理下で保持する。旧ディスク保持中の確保容量は各workerで
-合計60 GiBとなり、旧構成の3倍。削除は別途、データとバックアップを確認して判断する。
+コピー・切替した。OSディスクは変更していない。旧20 GiBディスクは切り離して
+一時保持した後、ユーザーの許可を受けて3本とも削除した（[#36](https://github.com/ictsc/ictsc-k8s-dev/pull/36)）。
+現在のLonghorn専用ディスクは各workerで40 GiBとなり、旧構成の2倍。
+削除前に旧ディスク3本のdetached、worker 3台Ready、Longhorn全8 volume healthyを確認した。
+削除後は旧ディスク3本がSakura APIで404、新ディスク3本が200、dev Terraformは差分なし。
 
 対応したPRは [#29](https://github.com/ictsc/ictsc-k8s-dev/pull/29)、
 [#30](https://github.com/ictsc/ictsc-k8s-dev/pull/30)、
