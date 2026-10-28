@@ -34,7 +34,10 @@ resource "sakura_disk" "longhorn" {
   connector = "virtio"
   size      = var.longhorn_disk_size[local.env]
 
-  # dev の旧ディスク削除後、prod の誤削除防止を別変更で復旧する。
+  # size の変更は既存データを消す replacement になる。prod の誤削除を防ぐ。
+  lifecycle {
+    prevent_destroy = true
+  }
 
   timeouts = {
     create = "1h"
