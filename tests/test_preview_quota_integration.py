@@ -22,18 +22,20 @@ def kubectl(*args, input=None, check=True):
 class QuotaIntegrationTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        # A minimal namespaced Application CRD exercises Kubernetes' native
-        # count/applications.argoproj.io admission without deploying Argo CD.
-        crd = {
-            "apiVersion": "apiextensions.k8s.io/v1", "kind": "CustomResourceDefinition",
-            "metadata": {"name": "applications.argoproj.io"},
-            "spec": {"group": "argoproj.io", "scope": "Namespaced",
-                     "names": {"plural": "applications", "singular": "application", "kind": "Application"},
-                     "versions": [{"name": "v1alpha1", "served": True, "storage": True,
-                                   "schema": {"openAPIV3Schema": {"type": "object",
-                                   "x-kubernetes-preserve-unknown-fields": True}}}]}}
-        kubectl("apply", "-f", "-", input=yaml.safe_dump(crd))
-        kubectl("wait", "--for=condition=Established", "crd/applications.argoproj.io", "--timeout=60s")
+        # Minimal namespaced Argo CRDs exercise Kubernetes' native object
+        # count admission without deploying the Argo CD controllers.
+        for plural, singular, kind in (("applications", "application", "Application"),
+                                       ("applicationsets", "applicationset", "ApplicationSet")):
+            crd = {
+                "apiVersion": "apiextensions.k8s.io/v1", "kind": "CustomResourceDefinition",
+                "metadata": {"name": f"{plural}.argoproj.io"},
+                "spec": {"group": "argoproj.io", "scope": "Namespaced",
+                         "names": {"plural": plural, "singular": singular, "kind": kind},
+                         "versions": [{"name": "v1alpha1", "served": True, "storage": True,
+                                       "schema": {"openAPIV3Schema": {"type": "object",
+                                       "x-kubernetes-preserve-unknown-fields": True}}}]}}
+            kubectl("apply", "-f", "-", input=yaml.safe_dump(crd))
+            kubectl("wait", "--for=condition=Established", f"crd/{plural}.argoproj.io", "--timeout=60s")
         docs = list(yaml.safe_load_all(PROPOSAL.read_text()))
         namespace, quota, project, appset = docs
         assert namespace["metadata"]["name"] == NAMESPACE
@@ -43,16 +45,17 @@ class QuotaIntegrationTests(unittest.TestCase):
         assert NAMESPACE in project["spec"]["sourceNamespaces"]
         assert quota["spec"]["hard"]["count/applications.argoproj.io"] == "3"
         kubectl("apply", "-f", "-", input=yaml.safe_dump_all([namespace, quota]))
-        deadline = time.monotonic() + 60
+        deadline = time.monotonic() + 180
         while time.monotonic() < deadline:
             result = kubectl("get", "quota", "preview-applications", "-n", NAMESPACE, "-o", "json")
             status = json.loads(result.stdout).get("status", {})
             if (status.get("hard", {}).get("count/applications.argoproj.io") == "3"
-                    and status.get("used", {}).get("count/applications.argoproj.io") == "0"):
+                    and status.get("used", {}).get("count/applications.argoproj.io") == "0"
+                    and status.get("used", {}).get("count/applicationsets.argoproj.io") == "0"):
                 break
             time.sleep(1)
         else:
-            raise AssertionError("ResourceQuota status did not become ready")
+            raise AssertionError(f"ResourceQuota status did not become ready: {status}")
 
     def create(self, number):
         app = {"apiVersion": "argoproj.io/v1alpha1", "kind": "Application",

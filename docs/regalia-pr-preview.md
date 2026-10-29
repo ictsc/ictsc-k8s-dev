@@ -17,6 +17,11 @@ The inactive ApplicationSet proposal now lives in a dedicated
 three `Application` objects there, including concurrent create requests.
 Existing Applications keep their quota slots while excess PRs are rejected;
 removing a label or closing a PR releases a slot after Application deletion.
+GitHub's open/`preview` PR set is selected by one ApplicationSet generator;
+Kubernetes quota admission is the single authority for capacity. At capacity,
+the ApplicationSet may report a quota error for pending PRs, but must not
+mark them Ready. Existing admitted Applications are expected to retain their
+slots; confirm this with the controller during activation.
 The separate Argo CD any-namespace settings in
 `activation/argocd-namespace-values.yaml` are **not loaded** by dev.
 
