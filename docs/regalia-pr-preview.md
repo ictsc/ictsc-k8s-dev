@@ -21,7 +21,9 @@ open state, preview label, and all three artifact IDs/digests before copying to
 fixed GHCR tags. It does not check out or execute PR code. The publisher
 checks raw manifest bytes before reusing an existing tag and verifies the
 copied manifest. A disposable fork PR must verify GitHub's workflow-run PR
-association and artifact download before activation.
+association and artifact download before activation. The trusted publisher
+job is gated by `ENABLE_PR_PREVIEW_PUBLISH=true` in the Regalia repository;
+without that variable it skips and writes no PR images to GHCR.
 
 The proxy is built only from `ictsc-k8s-dev` main. It checks the parent-domain
 Regalia OAuth cookie with the trusted `regalia-auth` service. Unauthenticated
@@ -48,23 +50,26 @@ login uses the seeded `preview-contestant` account and sample problems.
 1. Provision `argocd/regalia-pr-preview-github-app` from existing secret
    management in GitHub App repo-creds format with read-only PR access.
    ApplicationSet's `appSecretName` mints short-lived installation tokens.
-2. Confirm Cilium 1.20.1 ListenerSet CRD is installed and the operator has
+2. Temporarily set `ENABLE_PR_PREVIEW_PUBLISH=true` for a disposable PR test,
+   then turn it off until all activation gates pass. This repository variable
+   is a separate action, not changed by merging these PRs.
+3. Confirm Cilium 1.20.1 ListenerSet CRD is installed and the operator has
    detected it. Cilium documents an operator restart if the CRD was installed
    afterward. Apply the Gateway patch only after verifying it permits selected
    PR namespaces and leaves existing listeners and routes intact.
-3. Confirm the actual cluster DNS service IP. The chart's proposed value is
+4. Confirm the actual cluster DNS service IP. The chart's proposed value is
    `10.96.0.10` from the configured `10.96.0.0/12` service range; it has not
    been observed live. Confirm CNPG operator, DNS, auth and Gateway traffic
    through the NetworkPolicies before enabling exposure.
-4. Add an enforced **cluster-wide cap** on active previews. Per-namespace
+5. Add an enforced **cluster-wide cap** on active previews. Per-namespace
    ResourceQuota alone does not limit the number of PR namespaces. The current
    ApplicationSet has no global cap, so it must remain inactive.
-5. Run a disposable PR end to end: image build, fake contestant login, known
+6. Run a disposable PR end to end: image build, fake contestant login, known
    sample problem, cert-manager HTTP-01 first issuance, TLS ListenerSet
    Accepted/Programmed, auth redirect and malicious-header tests, commit
    update/migration, label removal, PR close, Application/namespace/PVC teardown.
    Verify Pod health and HTTP response before posting any Ready comment.
-6. Only after these gates pass, add the ApplicationSet to
+7. Only after these gates pass, add the ApplicationSet to
    `manifest/envs/dev/kustomization.yaml` and explicitly set exposure true in
    its fixed Helm parameters. No new Cloudflare key or DNS change is expected.
 
