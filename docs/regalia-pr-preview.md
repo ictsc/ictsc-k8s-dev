@@ -27,7 +27,8 @@ Application in place while creation of the fourth keeps failing. The kind
 test below proves the atomic admission cap only; it does not test Argo's
 reconciliation lifecycle.
 
-Before activation, add a small trusted cleanup Job in Argo's namespace. It
+The inactive `activation/cleanup.yaml` provides a small trusted cleanup
+CronJob in Argo's namespace. It
 must list the ApplicationSet-owned Applications in the dedicated source
 namespace, fetch the current open, `preview`-labeled PR numbers via the same
 GitHub App, and delete only Applications whose PR is no longer eligible. It
@@ -40,7 +41,11 @@ deleting, a retry of the ApplicationSet reconcile can admit the next PR.
 The ResourceQuota remains the atomic limit under concurrent events. This is
 smaller than a replacement controller or generator plugin because it only
 removes stale objects; a plugin alone cannot change Argo's create-before-delete
-order. Test three admitted plus one pending, label removal, close, head
+order. The Python code has unit tests for complete pagination, fail-closed
+responses, ownership, relabel recheck, and deletion preconditions. The image
+is published only through the trusted main-branch `Preview cleanup` manual
+workflow; it has not been published or deployed. Test three admitted plus one
+pending, label removal, close, head
 update, simultaneous events, and interrupted deletion with the real Argo
 controller before activation.
 The separate Argo CD any-namespace settings in
@@ -121,8 +126,9 @@ login uses the seeded `preview-contestant` account and sample problems.
    disposable kind test creates eight Applications concurrently and checks
    that only three are admitted, incumbents persist while full, and a closed
    PR's slot can be reused by a direct API create. Argo CD 3.5 does mishandle
-   the over-quota create/delete order; implement the trusted cleanup Job
-   above and test it with Argo before activation.
+   the over-quota create/delete order. Publish the trusted cleanup image,
+   review and add `activation/cleanup.yaml`, then test the cleanup Job with
+   Argo before activation.
 6. Resolve the same-site JavaScript cookie-writing boundary before exposing
    arbitrary PR app code. Do not treat the proxy's header filter as complete
    browser-origin isolation.
