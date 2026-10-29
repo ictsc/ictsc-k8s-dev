@@ -47,8 +47,10 @@ spec:
           parameters:
             - name: prNumber
               value: '{{.number}}'
+              forceString: true
             - name: headSHA
               value: '{{.head_sha}}'
+              forceString: true
       destination:
         server: https://kubernetes.default.svc
         namespace: 'regalia-pr-{{.number}}'
