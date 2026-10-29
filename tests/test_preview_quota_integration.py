@@ -4,6 +4,7 @@ import json
 import os
 from pathlib import Path
 import subprocess
+import time
 import unittest
 import yaml
 
@@ -42,6 +43,15 @@ class QuotaIntegrationTests(unittest.TestCase):
         assert NAMESPACE in project["spec"]["sourceNamespaces"]
         assert quota["spec"]["hard"]["count/applications.argoproj.io"] == "3"
         kubectl("apply", "-f", "-", input=yaml.safe_dump_all([namespace, quota]))
+        deadline = time.monotonic() + 60
+        while time.monotonic() < deadline:
+            result = kubectl("get", "quota", "preview-applications", "-n", NAMESPACE, "-o", "json")
+            status = json.loads(result.stdout).get("status", {})
+            if status.get("hard", {}).get("count/applications.argoproj.io") == "3":
+                break
+            time.sleep(1)
+        else:
+            raise AssertionError("ResourceQuota status did not become ready")
 
     def create(self, number):
         app = {"apiVersion": "argoproj.io/v1alpha1", "kind": "Application",
