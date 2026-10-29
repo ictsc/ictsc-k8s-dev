@@ -5,6 +5,7 @@ on:
       - 'manifest/**'
       - 'charts/**'
       - 'scripts/**'
+      - 'preview-cleanup/**'
       - 'aqua.yaml'
       - '.github/workflows/gitops.yml'
   push:
@@ -13,6 +14,7 @@ on:
       - 'manifest/**'
       - 'charts/**'
       - 'scripts/**'
+      - 'preview-cleanup/**'
       - 'aqua.yaml'
       - '.github/workflows/gitops.yml'
   workflow_dispatch:

@@ -85,32 +85,34 @@ class CleanupTests(unittest.TestCase):
         self.assertEqual(deletes[0][1]["preconditions"],
                          {"uid": "app-2", "resourceVersion": "12"})
 
-    def test_conflict_on_one_stale_app_does_not_block_next(self):
-        deleted = []
+    def test_conflict_or_not_found_on_one_stale_app_does_not_block_next(self):
         def github(url, **kwargs):
             if "/pulls?" in url:
                 return []
             if url.endswith("/pulls/1") or url.endswith("/pulls/2"):
                 return pull(int(url.rsplit("/", 1)[1]), state="closed")
             raise AssertionError(url)
-        def kube(path, **kwargs):
-            if path.endswith("/applicationsets/regalia-pr-preview"):
-                return {"metadata": {"uid": "owner-uid"}}
-            if "/applications?" in path:
-                return {"items": [app(1), app(2)], "metadata": {}}
-            if kwargs.get("method") == "DELETE":
-                deleted.append(path)
-                if path.endswith("regalia-pr-1"):
-                    raise HTTPError(path, 409, "conflict", {}, None)
-                return {"status": "Success"}
-            raise AssertionError(path)
-        with patch.object(cleanup, "github_token", return_value="gh-token"), \
-                patch.dict(cleanup.os.environ, {"GITHUB_APP_ID": "1",
-                                             "GITHUB_APP_INSTALLATION_ID": "2",
-                                             "GITHUB_APP_PRIVATE_KEY": "test"}), \
-                patch("builtins.open", mock_open(read_data="sa-token")):
-            cleanup.run(kube, github)
-        self.assertEqual(len(deleted), 2)
+        for error_code in (404, 409):
+            with self.subTest(error_code=error_code):
+                deleted = []
+                def kube(path, **kwargs):
+                    if path.endswith("/applicationsets/regalia-pr-preview"):
+                        return {"metadata": {"uid": "owner-uid"}}
+                    if "/applications?" in path:
+                        return {"items": [app(1), app(2)], "metadata": {}}
+                    if kwargs.get("method") == "DELETE":
+                        deleted.append(path)
+                        if path.endswith("regalia-pr-1"):
+                            raise HTTPError(path, error_code, "changed", {}, None)
+                        return {"status": "Success"}
+                    raise AssertionError(path)
+                with patch.object(cleanup, "github_token", return_value="gh-token"), \
+                        patch.dict(cleanup.os.environ, {"GITHUB_APP_ID": "1",
+                                                     "GITHUB_APP_INSTALLATION_ID": "2",
+                                                     "GITHUB_APP_PRIVATE_KEY": "test"}), \
+                        patch("builtins.open", mock_open(read_data="sa-token")):
+                    cleanup.run(kube, github)
+                self.assertEqual(len(deleted), 2)
 
 
 if __name__ == "__main__":
