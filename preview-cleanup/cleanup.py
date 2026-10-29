@@ -5,6 +5,7 @@ import os
 import re
 import ssl
 import time
+from urllib.error import HTTPError
 from urllib.parse import quote
 from urllib.request import Request, urlopen
 
@@ -109,6 +110,8 @@ def obsolete_owned_apps(apps, appset_uid, eligible):
     obsolete = []
     for app in apps:
         metadata = app.get("metadata", {})
+        if metadata.get("namespace") != NAMESPACE:
+            continue
         match = APP_NAME.fullmatch(metadata.get("name", ""))
         if not match or int(match.group(1)) in eligible:
             continue
@@ -139,10 +142,17 @@ def run(request=kubernetes_request, github_request=request_json):
     for number, metadata in obsolete_owned_apps(apps, appset_uid, eligible):
         if not still_ineligible(number, gh_token, github_request):
             continue
-        request(f"{base}/applications/{metadata['name']}", token=sa_token,
-                method="DELETE", body={"apiVersion": "v1", "kind": "DeleteOptions",
-                                       "preconditions": {"uid": metadata["uid"],
-                                                         "resourceVersion": metadata["resourceVersion"]}})
+        try:
+            request(f"{base}/applications/{metadata['name']}", token=sa_token,
+                    method="DELETE", body={"apiVersion": "v1", "kind": "DeleteOptions",
+                                           "preconditions": {"uid": metadata["uid"],
+                                                             "resourceVersion": metadata["resourceVersion"]}})
+        except HTTPError as error:
+            # Another reconciler may have updated or deleted the object after
+            # our list. Leave that object to the next pass, but keep cleaning
+            # unrelated stale Applications in this pass.
+            if error.code not in (404, 409):
+                raise
 
 
 if __name__ == "__main__":

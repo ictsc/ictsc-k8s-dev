@@ -42,7 +42,10 @@ The ResourceQuota remains the atomic limit under concurrent events. This is
 smaller than a replacement controller or generator plugin because it only
 removes stale objects; a plugin alone cannot change Argo's create-before-delete
 order. The Python code has unit tests for complete pagination, fail-closed
-responses, ownership, relabel recheck, and deletion preconditions. The image
+responses, ownership, namespace isolation, relabel recheck, deletion
+preconditions, and conflict continuation. A PR can be relabeled or reopened
+after the last GitHub check and before Kubernetes accepts DELETE; that rare
+cross-system race can delete and then recreate its disposable preview. The image
 is published only through the trusted main-branch `Preview cleanup` manual
 workflow; it has not been published or deployed. Test three admitted plus one
 pending, label removal, close, head

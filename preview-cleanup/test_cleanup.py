@@ -1,4 +1,5 @@
 import unittest
+from urllib.error import HTTPError
 from unittest.mock import patch, mock_open
 import cleanup
 from cleanup import eligible_numbers, obsolete_owned_apps, still_ineligible
@@ -6,6 +7,7 @@ from cleanup import eligible_numbers, obsolete_owned_apps, still_ineligible
 
 def app(number, *, owner="owner-uid", name=None):
     return {"metadata": {"name": name or f"regalia-pr-{number}",
+                         "namespace": "regalia-preview-control",
                          "uid": f"app-{number}", "resourceVersion": "12",
                          "ownerReferences": [{"apiVersion": "argoproj.io/v1alpha1",
                                               "kind": "ApplicationSet",
@@ -35,7 +37,9 @@ class CleanupTests(unittest.TestCase):
 
     def test_only_obsolete_owned_preview_apps_selected(self):
         apps = [app(1), app(2), app(3), app(4), app(5, owner="other"),
-                app(6, name="unrelated-6")]
+                app(6, name="unrelated-6"),
+                {**app(7), "metadata": {**app(7)["metadata"],
+                                         "namespace": "argocd"}}]
         self.assertEqual([n for n, _ in obsolete_owned_apps(apps, "owner-uid", {1, 3, 4})],
                          [2])
 
@@ -80,6 +84,33 @@ class CleanupTests(unittest.TestCase):
         self.assertTrue(deletes[0][0].endswith("/applications/regalia-pr-2"))
         self.assertEqual(deletes[0][1]["preconditions"],
                          {"uid": "app-2", "resourceVersion": "12"})
+
+    def test_conflict_on_one_stale_app_does_not_block_next(self):
+        deleted = []
+        def github(url, **kwargs):
+            if "/pulls?" in url:
+                return []
+            if url.endswith("/pulls/1") or url.endswith("/pulls/2"):
+                return pull(int(url.rsplit("/", 1)[1]), state="closed")
+            raise AssertionError(url)
+        def kube(path, **kwargs):
+            if path.endswith("/applicationsets/regalia-pr-preview"):
+                return {"metadata": {"uid": "owner-uid"}}
+            if "/applications?" in path:
+                return {"items": [app(1), app(2)], "metadata": {}}
+            if kwargs.get("method") == "DELETE":
+                deleted.append(path)
+                if path.endswith("regalia-pr-1"):
+                    raise HTTPError(path, 409, "conflict", {}, None)
+                return {"status": "Success"}
+            raise AssertionError(path)
+        with patch.object(cleanup, "github_token", return_value="gh-token"), \
+                patch.dict(cleanup.os.environ, {"GITHUB_APP_ID": "1",
+                                             "GITHUB_APP_INSTALLATION_ID": "2",
+                                             "GITHUB_APP_PRIVATE_KEY": "test"}), \
+                patch("builtins.open", mock_open(read_data="sa-token")):
+            cleanup.run(kube, github)
+        self.assertEqual(len(deleted), 2)
 
 
 if __name__ == "__main__":
