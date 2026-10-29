@@ -37,9 +37,10 @@ Only the migration init container uses the PR-supplied migrations image; it
 receives no database password or service-account token and copies SQL into a
 shared volume. A fixed `postgres:16-alpine` runner applies numbered migrations
 in order, checks stored SHA-256 checksums on head updates, and seeds an empty
-preview DB from the PR's `seed-dev.sql`. It fails if psql errors or an existing
-migration changes. An interrupted migration between SQL apply and ledger insert
-requires deleting the disposable PR namespace and recreating it. Fake Discord
+preview DB from the PR's `seed-dev.sql`. A changed or removed migration resets
+only the disposable PR database schema before replay. It fails if psql errors.
+An interrupted multi-statement migration may require deleting the disposable
+PR namespace and recreating it. Fake Discord
 login uses the seeded `preview-contestant` account and sample problems.
 
 ## Activation gates

@@ -99,7 +99,8 @@ spec:
       ports: [{protocol: TCP, port: 8080}]
     - to:
         - namespaceSelector: {matchLabels: {kubernetes.io/metadata.name: oauth2-proxy}}
-      ports: [{protocol: TCP, port: 80}]
+      # Service port 80 may be translated to the oauth2-proxy pod's 4180.
+      ports: [{protocol: TCP, port: 80}, {protocol: TCP, port: 4180}]
     - to:
         - namespaceSelector: {matchLabels: {kubernetes.io/metadata.name: kube-system}}
       ports: [{protocol: UDP, port: 53}, {protocol: TCP, port: 53}]
