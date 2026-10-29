@@ -123,9 +123,12 @@ login uses the seeded `preview-contestant` account and sample problems.
    render the cross-namespace ApplicationSet RBAC; the inactive overlay sets
    it for review.
    The source namespace has a hard quota of three Application CRs. The
-   disposable kind test creates eight Applications concurrently and checks
-   that only three are admitted, incumbents persist while full, and a closed
-   PR's slot can be reused by a direct API create. Argo CD 3.5 does mishandle
+   disposable kind test creates eight native Lease objects concurrently under
+   the same generic object-count quota syntax and checks that only three are
+   admitted, incumbents persist while full, and a deleted object's slot can
+   be reused. Newly installed fake Argo CRDs did not initialize quota usage
+   in the short-lived CI cluster; verify the actual Argo Application CRD quota
+   in dev before activation. Argo CD 3.5 does mishandle
    the over-quota create/delete order. Publish the trusted cleanup image,
    review and add `activation/cleanup.yaml`, then test the cleanup Job with
    Argo before activation.
