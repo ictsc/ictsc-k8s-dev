@@ -42,7 +42,6 @@ func newProxy(host, authURL, frontendURL, backendURL string) (*proxy, error) {
 }
 
 func (p *proxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
- if r.URL.Path == "/internal/healthz" { w.WriteHeader(http.StatusNoContent); return }
  if r.Host != p.host { http.Error(w,"invalid host",http.StatusMisdirectedRequest); return }
  authReq, err := http.NewRequestWithContext(r.Context(),http.MethodGet,p.authURL,nil)
  if err != nil { http.Error(w,"auth unavailable",http.StatusServiceUnavailable); return }

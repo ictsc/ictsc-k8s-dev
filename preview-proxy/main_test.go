@@ -57,3 +57,12 @@ func TestAuthFailureClosedAndHostCheck(t *testing.T) {
  w=httptest.NewRecorder();p.ServeHTTP(w,req)
  if w.Code!=http.StatusMisdirectedRequest {t.Fatalf("status %d",w.Code)}
 }
+
+func TestNoPublicHealthBypass(t *testing.T) {
+ auth:=httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter,_ *http.Request){w.WriteHeader(http.StatusUnauthorized)}));defer auth.Close()
+ app:=httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter,_ *http.Request){t.Fatal("app called") }));defer app.Close()
+ p,_:=newProxy("pr-7.k8s-dev.ictsc.net",auth.URL,app.URL,app.URL)
+ req:=httptest.NewRequest("GET","https://pr-7.k8s-dev.ictsc.net/internal/healthz",nil)
+ w:=httptest.NewRecorder();p.ServeHTTP(w,req)
+ if w.Code!=http.StatusFound {t.Fatalf("status %d",w.Code)}
+}

@@ -25,7 +25,7 @@ spec:
           env:
             - {name: PREVIEW_HOST, value: "pr-{{ .Values.prNumber }}.k8s-dev.ictsc.net"}
           readinessProbe:
-            httpGet: {path: /internal/healthz, port: http}
+            tcpSocket: {port: http}
           resources:
             requests: {cpu: 25m, memory: 32Mi}
             limits: {cpu: 250m, memory: 128Mi}
