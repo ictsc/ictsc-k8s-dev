@@ -32,8 +32,18 @@ callback route with `rd` fixed to their PR hostname. The proxy forwards only
 specified non-identity headers and the Regalia application session cookie names
 to PR code. It rebuilds allowlisted response cookies as Secure, HttpOnly,
 SameSite=Strict, host-only cookies and removes `Clear-Site-Data`. The PR image
-never receives the parent-domain OAuth cookie or identity headers. Test this
-boundary with a malicious app image and OAuth redirect flow on a disposable PR.
+never receives the parent-domain OAuth cookie or identity headers. **This does
+not isolate sibling hosts from PR JavaScript:** a script on
+`pr-N.k8s-dev.ictsc.net` can set new cookies with
+`Domain=k8s-dev.ictsc.net`, potentially shadowing or flooding cookies sent to
+`contest.k8s-dev.ictsc.net`. HttpOnly protects existing values from reading,
+but does not prevent such writes. The current same-site hostname therefore
+remains an activation blocker for arbitrary PR code. Test it in a browser by
+writing a parent-domain cookie from the PR page and observing the Cookie header
+at a disposable sibling endpoint. Options require a separately reviewed
+browser isolation design, such as an opaque-origin sandbox with a tested API
+bridge, or a separate registrable site for the untrusted app with the requested
+PR URL serving only a trusted entry page. Neither option is implemented here.
 
 Only the migration init container uses the PR-supplied migrations image; it
 receives no database password or service-account token and copies SQL into a
@@ -67,17 +77,28 @@ login uses the seeded `preview-contestant` account and sample problems.
    Backend, frontend, migration and Valkey remain policy-scoped.
 5. Add an enforced **cluster-wide cap** on active previews. Per-namespace
    ResourceQuota alone does not limit the number of PR namespaces. The current
-   ApplicationSet has no global cap, so it must remain inactive.
-6. Run a disposable PR end to end: image build, fake contestant login, known
+   ApplicationSet has no global cap, so it must remain inactive. One native
+   option is a dedicated Argo CD source namespace with
+   `count/applications.argoproj.io: "3"` ResourceQuota. This requires enabling
+   Application and ApplicationSet in that exact namespace and setting the
+   AppProject's `sourceNamespaces`; Argo CD warns that this changes the
+   security boundary for generator secrets. It needs a separate configuration
+   and RBAC review before adoption.
+6. Resolve the same-site JavaScript cookie-writing boundary before exposing
+   arbitrary PR app code. Do not treat the proxy's header filter as complete
+   browser-origin isolation.
+7. Run a disposable PR end to end: image build, fake contestant login, known
    sample problem, cert-manager HTTP-01 first issuance, TLS ListenerSet
    Accepted/Programmed, auth redirect and malicious-header tests, commit
    update/migration, label removal, PR close, Application/namespace/PVC teardown.
    Verify Pod health and HTTP response before posting any Ready comment.
-7. Only after these gates pass, add the ApplicationSet to
+8. Only after these gates pass, add the ApplicationSet to
    `manifest/envs/dev/kustomization.yaml` and explicitly set exposure true in
    its fixed Helm parameters. No new Cloudflare key or DNS change is expected.
 
 Cilium ListenerSet behavior is documented in its
 [v1.20.1 guide](https://github.com/cilium/cilium/blob/v1.20.1/Documentation/network/servicemesh/gateway-api/listenerset.rst).
 The [Argo CD PR generator documentation](https://argo-cd.readthedocs.io/en/latest/operator-manual/applicationset/Generators-Pull-Request/)
-describes `appSecretName`, `head_sha` and label-driven removal.
+describes `appSecretName`, `head_sha` and label-driven removal. The
+[ApplicationSet in any namespace guide](https://argo-cd.readthedocs.io/en/latest/operator-manual/applicationset/Appset-Any-Namespace/)
+describes the additional controls needed for a dedicated quota namespace.
