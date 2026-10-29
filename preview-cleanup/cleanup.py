@@ -118,6 +118,7 @@ def obsolete_owned_apps(apps, appset_uid, eligible):
         if not any(ref.get("apiVersion") == "argoproj.io/v1alpha1"
                    and ref.get("kind") == "ApplicationSet"
                    and ref.get("name") == APPSET and ref.get("uid") == appset_uid
+                   and ref.get("controller") is True
                    for ref in metadata.get("ownerReferences", [])):
             continue
         if not metadata.get("uid") or not metadata.get("resourceVersion"):

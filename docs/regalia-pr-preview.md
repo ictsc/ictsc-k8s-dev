@@ -27,6 +27,15 @@ Application in place while creation of the fourth keeps failing. The kind
 test below proves the atomic admission cap only; it does not test Argo's
 reconciliation lifecycle.
 
+On 2026-10-29, an isolated dev namespace ran the actual Argo CD v3.5.0
+ApplicationSet controller with the installed Application CRD and a three-App
+quota. A credential-free list generator created three Apps; a fourth failed
+admission. Removing one incumbent from the generator did not delete it because
+the fourth create failed first. Manually deleting the stale App freed the slot
+only after its resources finalizer was cleared; that isolated controller had
+no Application controller to finish deletion. This reproduces the proposed
+cleanup's need but does not validate the cleanup Job or a real PR generator.
+
 The inactive `activation/cleanup.yaml` provides a small trusted cleanup
 CronJob in Argo's namespace. It
 must list the ApplicationSet-owned Applications in the dedicated source
@@ -48,9 +57,12 @@ after the last GitHub check and before Kubernetes accepts DELETE; that rare
 cross-system race can delete and then recreate its disposable preview. The image
 is published only through the trusted main-branch `Preview cleanup` manual
 workflow; it has not been published or deployed. Test three admitted plus one
-pending, label removal, close, head
-update, simultaneous events, and interrupted deletion with the real Argo
-controller before activation.
+pending with the GitHub generator and cleanup Job, plus label removal, close,
+head update, simultaneous events, and interrupted deletion before activation.
+Cleanup sends DELETE but never bypasses the resources finalizer. If the
+Application controller cannot finish deletion, the quota slot stays occupied;
+the next cleanup run retries DELETE and does not force-remove the finalizer.
+The live finalizer/PVC check below used a separate Application in `argocd`.
 The separate Argo CD any-namespace settings in
 `activation/argocd-namespace-values.yaml` are **not loaded** by dev.
 
@@ -134,14 +146,23 @@ login uses the seeded `preview-contestant` account and sample problems.
    finalizer removal. The test installs a minimal Argo-compatible CRD, not the
    exact Argo 3.5 CRD or controller. A short 5s quota resync is configured
    only in kind because the production controller's default resync period is
-   5m; the earlier 180s CI failures were consistent with that delay. Verify
-   the actual Argo Application CRD quota in dev before activation. Argo CD 3.5 does mishandle
-   the over-quota create/delete order. Publish the trusted cleanup image,
+   5m; the earlier 180s CI failures were consistent with that delay. Dev
+   verified admission with the installed Argo CRD and reproduced the Argo CD
+   3.5 create-before-delete failure with a separate controller and list
+   generator. Publish the trusted cleanup image,
    review and add `activation/cleanup.yaml`, then test the cleanup Job with
    Argo before activation. This CI has not installed Argo CD 3.5: fetching
    `https://argoproj.github.io/argo-helm/index.yaml` from the implementation
    environment returned HTTP 403. Do not substitute the minimal CRD test for
    the real controller lifecycle test.
+   A separate manual-sync dev Application selected only the chart's Namespace
+   and CNPG Cluster with `enableExposure` set to boolean `false`. CNPG became
+   healthy and bound a 1Gi `longhorn-single-replica` PVC. Deleting that
+   Application with Argo's resources finalizer removed the Application,
+   namespace, CNPG Cluster, PVC, PV, and Longhorn volume. No preview route or
+   certificate was created. This did not test the full chart or AppSet-driven
+   deletion. Pass a boolean Helm value for `enableExposure`: forcing the
+   string `"false"` makes the chart render exposure resources.
 6. Resolve the same-site JavaScript cookie-writing boundary before exposing
    arbitrary PR app code. Do not treat the proxy's header filter as complete
    browser-origin isolation.
