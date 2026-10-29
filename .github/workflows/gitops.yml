@@ -19,6 +19,22 @@ on:
 permissions:
   contents: read
 jobs:
+  preview_quota:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v5
+      - uses: aquaproj/aqua-installer@v4.0.5
+        with:
+          aqua_version: v2.62.3
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+      - run: python -m pip install PyYAML==6.0.3
+      - name: Start disposable Kubernetes cluster
+        run: kind create cluster --image kindest/node:v1.36.4@sha256:099e049362a1526b2db71494e1947aae99bd16290d7c895f2b7ea312e3cbfaed --wait 120s
+      - name: Enforce three concurrent Application objects
+        run: PREVIEW_QUOTA_TEST=1 PYTHONDONTWRITEBYTECODE=1 python -m unittest discover -s tests -p 'test_preview_quota_integration.py' -v
   manifests:
     runs-on: ubuntu-latest
     timeout-minutes: 15

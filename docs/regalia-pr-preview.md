@@ -12,6 +12,14 @@ HTTP-01 Certificate, ListenerSet, and routes are rendered only when
 `allowedListeners` patch is in `activation/gateway-listenerset-patch.yaml` and
 is not part of the dev kustomization.
 
+The inactive ApplicationSet proposal now lives in a dedicated
+`regalia-preview-control` source namespace. A ResourceQuota admits at most
+three `Application` objects there, including concurrent create requests.
+Existing Applications keep their quota slots while excess PRs are rejected;
+removing a label or closing a PR releases a slot after Application deletion.
+The separate Argo CD any-namespace settings in
+`activation/argocd-namespace-values.yaml` are **not loaded** by dev.
+
 ## Trust boundary
 
 `ictsc-regalia` builds backend, frontend, and migrations OCI artifacts in a
@@ -57,7 +65,7 @@ login uses the seeded `preview-contestant` account and sample problems.
 
 ## Activation gates
 
-1. Provision `argocd/regalia-pr-preview-github-app` from existing secret
+1. Provision `regalia-preview-control/regalia-pr-preview-github-app` from existing secret
    management in GitHub App repo-creds format with read-only PR access.
    ApplicationSet's `appSecretName` mints short-lived installation tokens.
 2. Temporarily set `ENABLE_PR_PREVIEW_PUBLISH=true` for a disposable PR test,
@@ -75,15 +83,14 @@ login uses the seeded `preview-contestant` account and sample problems.
    A CiliumNetworkPolicy permits only `ingress` and `host` (for the kubelet
    TCP probe) to reach proxy port 8080; the proxy authenticates every path.
    Backend, frontend, migration and Valkey remain policy-scoped.
-5. Add an enforced **cluster-wide cap** on active previews. Per-namespace
-   ResourceQuota alone does not limit the number of PR namespaces. The current
-   ApplicationSet has no global cap, so it must remain inactive. One native
-   option is a dedicated Argo CD source namespace with
-   `count/applications.argoproj.io: "3"` ResourceQuota. This requires enabling
-   Application and ApplicationSet in that exact namespace and setting the
-   AppProject's `sourceNamespaces`; Argo CD warns that this changes the
-   security boundary for generator secrets. It needs a separate configuration
-   and RBAC review before adoption.
+5. Review and enable the **dedicated Argo CD source namespace** settings from
+   `activation/argocd-namespace-values.yaml` only after checking Argo CD's
+   cluster RBAC, UI/RBAC exposure, secret access and controller restart order.
+   The source namespace has a hard quota of three Application CRs. The
+   disposable kind test creates eight Applications concurrently and checks
+   that only three are admitted, incumbents persist while full, and a closed
+   PR's slot can be reused. Argo CD itself still needs a live reconciliation
+   test when over quota; if it mishandles an admission error, leave inactive.
 6. Resolve the same-site JavaScript cookie-writing boundary before exposing
    arbitrary PR app code. Do not treat the proxy's header filter as complete
    browser-origin isolation.

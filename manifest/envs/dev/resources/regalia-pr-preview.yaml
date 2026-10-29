@@ -1,11 +1,30 @@
 # Deliberately absent from envs/dev/kustomization.yaml until the auth and HTTPS
 # boundary documented in docs/regalia-pr-preview.md has been validated.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: regalia-preview-control
+---
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: preview-applications
+  namespace: regalia-preview-control
+spec:
+  hard:
+    # Kubernetes quota admission serializes concurrent creates. Existing
+    # Application objects keep their slot until PR removal deletes them.
+    count/applications.argoproj.io: "3"
+    count/applicationsets.argoproj.io: "1"
+---
 apiVersion: argoproj.io/v1alpha1
 kind: AppProject
 metadata:
   name: regalia-pr-preview
   namespace: argocd
 spec:
+  sourceNamespaces:
+    - regalia-preview-control
   sourceRepos:
     - git@github.com:ictsc/ictsc-k8s-dev.git
   destinations:
@@ -19,7 +38,7 @@ apiVersion: argoproj.io/v1alpha1
 kind: ApplicationSet
 metadata:
   name: regalia-pr-preview
-  namespace: argocd
+  namespace: regalia-preview-control
 spec:
   goTemplate: true
   goTemplateOptions: [missingkey=error]
@@ -34,7 +53,7 @@ spec:
   template:
     metadata:
       name: 'regalia-pr-{{.number}}'
-      namespace: argocd
+      namespace: regalia-preview-control
       finalizers:
         - resources-finalizer.argocd.argoproj.io
     spec:
