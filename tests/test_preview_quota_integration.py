@@ -46,8 +46,11 @@ class QuotaIntegrationTests(unittest.TestCase):
             text=True, capture_output=True, check=True).stdout.strip()
         if not container or "\n" in container:
             raise AssertionError(f"expected one controller container, got: {container!r}")
-        subprocess.run(["docker", "exec", "kind-control-plane", "crictl",
-                        "stop", container], check=True, capture_output=True)
+        stopped = subprocess.run(["docker", "exec", "kind-control-plane", "crictl",
+                                  "stop", container], text=True, capture_output=True)
+        if stopped.returncode:
+            raise AssertionError(f"could not restart disposable quota controller: "
+                                 f"{stopped.stdout} {stopped.stderr}")
         docs = list(yaml.safe_load_all(PROPOSAL.read_text()))
         namespace, quota, project, appset = docs
         assert namespace["metadata"]["name"] == NAMESPACE
