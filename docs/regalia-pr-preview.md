@@ -19,9 +19,30 @@ Existing Applications keep their quota slots while excess PRs are rejected;
 removing a label or closing a PR releases a slot after Application deletion.
 GitHub's open/`preview` PR set is selected by one ApplicationSet generator;
 Kubernetes quota admission is the single authority for capacity. At capacity,
-the ApplicationSet may report a quota error for pending PRs, but must not
-mark them Ready. Existing admitted Applications are expected to retain their
-slots; confirm this with the controller during activation.
+the ApplicationSet reports a quota error for pending PRs. **This proposal
+cannot be activated as-is.** Argo CD 3.5 stops its ApplicationSet reconcile
+after a create error, before deleting obsolete Applications. With three
+admitted PRs and a fourth pending, closing an admitted PR leaves its old
+Application in place while creation of the fourth keeps failing. The kind
+test below proves the atomic admission cap only; it does not test Argo's
+reconciliation lifecycle.
+
+Before activation, add a small trusted cleanup Job in Argo's namespace. It
+must list the ApplicationSet-owned Applications in the dedicated source
+namespace, fetch the current open, `preview`-labeled PR numbers via the same
+GitHub App, and delete only Applications whose PR is no longer eligible. It
+must fail without deleting anything if the GitHub response is incomplete or
+unavailable, and recheck a PR immediately before deletion. Give it only
+list/get/delete Application RBAC in the source namespace and read access to
+the existing GitHub App credential. Run it at most once concurrently. This
+preserves ApplicationSet generation: once an obsolete Application finishes
+deleting, a retry of the ApplicationSet reconcile can admit the next PR.
+The ResourceQuota remains the atomic limit under concurrent events. This is
+smaller than a replacement controller or generator plugin because it only
+removes stale objects; a plugin alone cannot change Argo's create-before-delete
+order. Test three admitted plus one pending, label removal, close, head
+update, simultaneous events, and interrupted deletion with the real Argo
+controller before activation.
 The separate Argo CD any-namespace settings in
 `activation/argocd-namespace-values.yaml` are **not loaded** by dev.
 
@@ -70,9 +91,11 @@ login uses the seeded `preview-contestant` account and sample problems.
 
 ## Activation gates
 
-1. Provision `regalia-preview-control/regalia-pr-preview-github-app` from existing secret
+1. Provision `argocd/regalia-pr-preview-github-app` from existing secret
    management in GitHub App repo-creds format with read-only PR access.
-   ApplicationSet's `appSecretName` mints short-lived installation tokens.
+   Argo CD 3.5 resolves native `appSecretName` from its control namespace,
+   even when the ApplicationSet lives elsewhere. ApplicationSet mints
+   short-lived installation tokens.
 2. Temporarily set `ENABLE_PR_PREVIEW_PUBLISH=true` for a disposable PR test,
    then turn it off until all activation gates pass. This repository variable
    is a separate action, not changed by merging these PRs.
@@ -91,11 +114,15 @@ login uses the seeded `preview-contestant` account and sample problems.
 5. Review and enable the **dedicated Argo CD source namespace** settings from
    `activation/argocd-namespace-values.yaml` only after checking Argo CD's
    cluster RBAC, UI/RBAC exposure, secret access and controller restart order.
+   Chart 10.2.3 also requires `applicationSet.allowAnyNamespace: true` to
+   render the cross-namespace ApplicationSet RBAC; the inactive overlay sets
+   it for review.
    The source namespace has a hard quota of three Application CRs. The
    disposable kind test creates eight Applications concurrently and checks
    that only three are admitted, incumbents persist while full, and a closed
-   PR's slot can be reused. Argo CD itself still needs a live reconciliation
-   test when over quota; if it mishandles an admission error, leave inactive.
+   PR's slot can be reused by a direct API create. Argo CD 3.5 does mishandle
+   the over-quota create/delete order; implement the trusted cleanup Job
+   above and test it with Argo before activation.
 6. Resolve the same-site JavaScript cookie-writing boundary before exposing
    arbitrary PR app code. Do not treat the proxy's header filter as complete
    browser-origin isolation.

@@ -37,10 +37,17 @@ class QuotaIntegrationTests(unittest.TestCase):
             kubectl("apply", "-f", "-", input=yaml.safe_dump(crd))
             kubectl("wait", "--for=condition=Established", f"crd/{plural}.argoproj.io", "--timeout=60s")
         # kind starts kube-controller-manager before these test CRDs exist.
-        # Restart its static Pod so its quota monitor discovers both resources.
-        # The real Argo CRDs predate activation in the dev cluster.
-        kubectl("delete", "pod", "-n", "kube-system", "-l",
-                "component=kube-controller-manager", "--wait=false")
+        # Restart the actual static-Pod container so its quota monitor
+        # discovers both resources. Deleting only its mirror Pod does not
+        # restart the container. The real Argo CRDs predate activation.
+        container = subprocess.run(
+            ["docker", "exec", "kind-control-plane", "crictl", "ps", "-q",
+             "--name", "kube-controller-manager"],
+            text=True, capture_output=True, check=True).stdout.strip()
+        if not container or "\n" in container:
+            raise AssertionError(f"expected one controller container, got: {container!r}")
+        subprocess.run(["docker", "exec", "kind-control-plane", "crictl",
+                        "stop", container], check=True, capture_output=True)
         docs = list(yaml.safe_load_all(PROPOSAL.read_text()))
         namespace, quota, project, appset = docs
         assert namespace["metadata"]["name"] == NAMESPACE
@@ -60,7 +67,10 @@ class QuotaIntegrationTests(unittest.TestCase):
                 break
             time.sleep(1)
         else:
-            raise AssertionError(f"ResourceQuota status did not become ready: {status}")
+            logs = kubectl("logs", "-n", "kube-system", "-l",
+                           "component=kube-controller-manager", "--tail=80", check=False)
+            raise AssertionError(f"ResourceQuota status did not become ready: {status}; "
+                                 f"controller logs: {logs.stdout[-5000:]} {logs.stderr[-500:]}")
 
     def create(self, number):
         app = {"apiVersion": "argoproj.io/v1alpha1", "kind": "Application",

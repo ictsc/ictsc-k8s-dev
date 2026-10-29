@@ -7,3 +7,6 @@ configs:
     applicationsetcontroller.enable.tokenref.strict.mode: "true"
   cm:
     application.resourceTrackingMethod: annotation
+applicationSet:
+  # argo-cd chart 10.2.3 gates cross-namespace ApplicationSet RBAC on this.
+  allowAnyNamespace: true
