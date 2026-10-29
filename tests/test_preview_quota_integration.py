@@ -129,8 +129,22 @@ class ArgoCRDQuotaIntegrationTests(unittest.TestCase):
         self.assertNotEqual(self.create(9).returncode, 0)
         self.assertEqual(self.names(), accepted)
         old = sorted(accepted)[0]
-        kubectl("delete", "application", old, "-n", CRD_NAMESPACE)
-        self.assertEqual(self.create(9).returncode, 0)
+        kubectl("patch", "application", old, "-n", CRD_NAMESPACE, "--type=merge",
+                "-p", '{"metadata":{"finalizers":["resources-finalizer.argocd.argoproj.io"]}}')
+        kubectl("delete", "application", old, "-n", CRD_NAMESPACE, "--wait=false")
+        self.assertIn(old, self.names())
+        self.assertNotEqual(self.create(9).returncode, 0)
+        kubectl("patch", "application", old, "-n", CRD_NAMESPACE, "--type=merge",
+                "-p", '{"metadata":{"finalizers":[]}}')
+        kubectl("wait", "--for=delete", f"application/{old}", "-n", CRD_NAMESPACE,
+                "--timeout=30s")
+        deadline = time.monotonic() + 30
+        while time.monotonic() < deadline:
+            if self.create(9).returncode == 0:
+                break
+            time.sleep(1)
+        else:
+            self.fail("slot was not released after finalizer removal")
         self.assertEqual(self.names(), (accepted - {old}) | {"regalia-pr-9"})
 
 

@@ -126,15 +126,22 @@ login uses the seeded `preview-contestant` account and sample problems.
    render the cross-namespace ApplicationSet RBAC; the inactive overlay sets
    it for review.
    The source namespace has a hard quota of three Application CRs. The
-   disposable kind test creates eight native Lease objects concurrently under
-   the same generic object-count quota syntax and checks that only three are
-   admitted, incumbents persist while full, and a deleted object's slot can
-   be reused. Newly installed fake Argo CRDs did not initialize quota usage
-   in the short-lived CI cluster; verify the actual Argo Application CRD quota
-   in dev before activation. Argo CD 3.5 does mishandle
+   disposable kind test creates eight native Lease objects and eight
+   `argoproj.io/v1alpha1` Application objects against the proposed count keys.
+   Each admits only three concurrent creates and preserves incumbents until a
+   slot is freed. The Application test also holds deletion with Argo's
+   resources finalizer and checks that the quota slot remains occupied until
+   finalizer removal. The test installs a minimal Argo-compatible CRD, not the
+   exact Argo 3.5 CRD or controller. A short 5s quota resync is configured
+   only in kind because the production controller's default resync period is
+   5m; the earlier 180s CI failures were consistent with that delay. Verify
+   the actual Argo Application CRD quota in dev before activation. Argo CD 3.5 does mishandle
    the over-quota create/delete order. Publish the trusted cleanup image,
    review and add `activation/cleanup.yaml`, then test the cleanup Job with
-   Argo before activation.
+   Argo before activation. This CI has not installed Argo CD 3.5: fetching
+   `https://argoproj.github.io/argo-helm/index.yaml` from the implementation
+   environment returned HTTP 403. Do not substitute the minimal CRD test for
+   the real controller lifecycle test.
 6. Resolve the same-site JavaScript cookie-writing boundary before exposing
    arbitrary PR app code. Do not treat the proxy's header filter as complete
    browser-origin isolation.
