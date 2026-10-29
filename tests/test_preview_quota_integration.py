@@ -47,7 +47,8 @@ class QuotaIntegrationTests(unittest.TestCase):
         while time.monotonic() < deadline:
             result = kubectl("get", "quota", "preview-applications", "-n", NAMESPACE, "-o", "json")
             status = json.loads(result.stdout).get("status", {})
-            if status.get("hard", {}).get("count/applications.argoproj.io") == "3":
+            if (status.get("hard", {}).get("count/applications.argoproj.io") == "3"
+                    and status.get("used", {}).get("count/applications.argoproj.io") == "0"):
                 break
             time.sleep(1)
         else:
