@@ -36,6 +36,11 @@ class QuotaIntegrationTests(unittest.TestCase):
                                        "x-kubernetes-preserve-unknown-fields": True}}}]}}
             kubectl("apply", "-f", "-", input=yaml.safe_dump(crd))
             kubectl("wait", "--for=condition=Established", f"crd/{plural}.argoproj.io", "--timeout=60s")
+        # kind starts kube-controller-manager before these test CRDs exist.
+        # Restart its static Pod so its quota monitor discovers both resources.
+        # The real Argo CRDs predate activation in the dev cluster.
+        kubectl("delete", "pod", "-n", "kube-system", "-l",
+                "component=kube-controller-manager", "--wait=false")
         docs = list(yaml.safe_load_all(PROPOSAL.read_text()))
         namespace, quota, project, appset = docs
         assert namespace["metadata"]["name"] == NAMESPACE
