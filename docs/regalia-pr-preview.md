@@ -62,8 +62,9 @@ login uses the seeded `preview-contestant` account and sample problems.
    been observed live. Confirm CNPG operator, DNS, auth and Gateway traffic
    through the NetworkPolicies before enabling exposure. Cilium Gateway uses
    the reserved `ingress` identity rather than a Pod identity in `gateway`.
-   The proxy permits traffic to port 8080 from all sources and authenticates
-   every path; backend, frontend, migration and Valkey remain policy-scoped.
+   A CiliumNetworkPolicy permits only `ingress` and `host` (for the kubelet
+   TCP probe) to reach proxy port 8080; the proxy authenticates every path.
+   Backend, frontend, migration and Valkey remain policy-scoped.
 5. Add an enforced **cluster-wide cap** on active previews. Per-namespace
    ResourceQuota alone does not limit the number of PR namespaces. The current
    ApplicationSet has no global cap, so it must remain inactive.

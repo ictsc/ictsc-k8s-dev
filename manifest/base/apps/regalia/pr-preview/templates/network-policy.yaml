@@ -87,11 +87,7 @@ kind: NetworkPolicy
 metadata: {name: preview-proxy}
 spec:
   podSelector: {matchLabels: {app: preview-proxy}}
-  policyTypes: [Ingress, Egress]
-  ingress:
-    # Cilium Gateway forwards with the reserved ingress identity, not a Pod
-    # identity in the gateway namespace. The proxy authenticates every path.
-    - ports: [{protocol: TCP, port: 8080}]
+  policyTypes: [Egress]
   egress:
     - to:
         - podSelector: {matchLabels: {app: preview-frontend}}
@@ -104,4 +100,17 @@ spec:
     - to:
         - namespaceSelector: {matchLabels: {kubernetes.io/metadata.name: kube-system}}
       ports: [{protocol: UDP, port: 53}, {protocol: TCP, port: 53}]
+---
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata: {name: preview-proxy-ingress}
+spec:
+  endpointSelector:
+    matchLabels: {app: preview-proxy}
+  ingress:
+    # Gateway API traffic carries the reserved ingress identity. Host is
+    # needed for the kubelet's TCP readiness probe.
+    - fromEntities: [ingress, host]
+      toPorts:
+        - ports: [{port: "8080", protocol: TCP}]
 {{- end }}
