@@ -89,9 +89,9 @@ spec:
   podSelector: {matchLabels: {app: preview-proxy}}
   policyTypes: [Ingress, Egress]
   ingress:
-    - from:
-        - namespaceSelector: {matchLabels: {kubernetes.io/metadata.name: gateway}}
-      ports: [{protocol: TCP, port: 8080}]
+    # Cilium Gateway forwards with the reserved ingress identity, not a Pod
+    # identity in the gateway namespace. The proxy authenticates every path.
+    - ports: [{protocol: TCP, port: 8080}]
   egress:
     - to:
         - podSelector: {matchLabels: {app: preview-frontend}}

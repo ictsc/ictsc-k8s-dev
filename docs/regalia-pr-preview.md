@@ -60,7 +60,10 @@ login uses the seeded `preview-contestant` account and sample problems.
 4. Confirm the actual cluster DNS service IP. The chart's proposed value is
    `10.96.0.10` from the configured `10.96.0.0/12` service range; it has not
    been observed live. Confirm CNPG operator, DNS, auth and Gateway traffic
-   through the NetworkPolicies before enabling exposure.
+   through the NetworkPolicies before enabling exposure. Cilium Gateway uses
+   the reserved `ingress` identity rather than a Pod identity in `gateway`.
+   The proxy permits traffic to port 8080 from all sources and authenticates
+   every path; backend, frontend, migration and Valkey remain policy-scoped.
 5. Add an enforced **cluster-wide cap** on active previews. Per-namespace
    ResourceQuota alone does not limit the number of PR namespaces. The current
    ApplicationSet has no global cap, so it must remain inactive.
