@@ -1,52 +1,73 @@
-# Regalia PR preview (draft)
+# Regalia PR preview activation
 
-The proposed ApplicationSet in `manifest/envs/dev/resources/regalia-pr-preview.yaml`
-is intentionally **not referenced** by the dev kustomization. The current chart
-creates an isolated namespace, PostgreSQL cluster, Valkey, and demo-mode app.
-It creates no HTTPRoute or ListenerSet, so no PR URL is live yet.
+The ApplicationSet in `manifest/envs/dev/resources/regalia-pr-preview.yaml` is
+**not referenced** by the dev kustomization. The chart has `enableExposure: false`
+by default. No PR URL is currently live, and merging this draft does not change
+the shared Gateway, contest, scoreserver, OAuth proxy, or DNS.
+
+The chart supplies one namespace, dedicated CNPG PostgreSQL and Valkey, quota,
+app, migration Job, and scoped NetworkPolicies per PR. The trusted proxy,
+HTTP-01 Certificate, ListenerSet, and routes are rendered only when
+`enableExposure` is deliberately set true. The shared Gateway's
+`allowedListeners` patch is in `activation/gateway-listenerset-patch.yaml` and
+is not part of the dev kustomization.
+
+## Trust boundary
+
+`ictsc-regalia` builds backend, frontend, and migrations OCI artifacts in a
+read-only `pull_request` workflow, including forks. A trusted default-branch
+`workflow_run` validates GitHub's run, workflow ID/path, current PR head SHA,
+open state, preview label, and all three artifact IDs/digests before copying to
+fixed GHCR tags. It does not check out or execute PR code. The publisher
+checks raw manifest bytes before reusing an existing tag and verifies the
+copied manifest. A disposable fork PR must verify GitHub's workflow-run PR
+association and artifact download before activation.
+
+The proxy is built only from `ictsc-k8s-dev` main. It checks the parent-domain
+Regalia OAuth cookie with the trusted `regalia-auth` service. Unauthenticated
+users go to the **existing fixed** `contest.k8s-dev.ictsc.net/oauth2/start`
+callback route with `rd` fixed to their PR hostname. The proxy forwards only
+specified non-identity headers and the Regalia application session cookie names
+to PR code. It rebuilds allowlisted response cookies as Secure, HttpOnly,
+SameSite=Strict, host-only cookies and removes `Clear-Site-Data`. The PR image
+never receives the parent-domain OAuth cookie or identity headers. Test this
+boundary with a malicious app image and OAuth redirect flow on a disposable PR.
+
+Only the migration init container uses the PR-supplied migrations image; it
+receives no database password or service-account token and copies SQL into a
+shared volume. A fixed `postgres:16-alpine` runner applies numbered migrations
+in order, checks stored SHA-256 checksums on head updates, and seeds an empty
+preview DB from the PR's `seed-dev.sql`. It fails if psql errors or an existing
+migration changes. An interrupted migration between SQL apply and ledger insert
+requires deleting the disposable PR namespace and recreating it. Fake Discord
+login uses the seeded `preview-contestant` account and sample problems.
 
 ## Activation gates
 
-1. Provision a read-only GitHub App token for ApplicationSet in the existing
-   secret manager and expose it as `argocd/regalia-pr-preview-github` (`token`).
-   No token value belongs in Git.
-2. Validate Cilium 1.20.1 ListenerSet CRDs and controller support on the dev
-   cluster. Add `allowedListeners` to the shared Gateway, then use one
-   ListenerSet and HTTP-01 Certificate per PR namespace. Confirm TLS Secret
-   discovery and HTTPRoute parent attachment on a disposable test namespace.
-3. Add an outer auth path with a trusted proxy that filters incoming Cookie,
-   Authorization and identity headers before PR code. The proxy must allow
-   only Regalia session cookie names
-   (`regalia-user-session`, `admin-session`, `signup-session`,
-   `oauth2-session`, `admin-oauth2-session`) and must filter response
-   `Set-Cookie`, `Clear-Site-Data`, and other privileged headers. Test with a
-   malicious PR image. The existing `.k8s-dev.ictsc.net` oauth2-proxy cookie
-   reaches PR subdomains, so host-only application cookies do not solve this.
-4. Verify HTTPS and auth on the real URL, including first HTTP-01 issuance,
-   commit updates, label removal, PR close, namespace and PVC deletion. Only
-   then add the ApplicationSet resource to `manifest/envs/dev/kustomization.yaml`
-   and allow a Ready comment after Pod and URL checks.
+1. Provision `argocd/regalia-pr-preview-github-app` from existing secret
+   management in GitHub App repo-creds format with read-only PR access.
+   ApplicationSet's `appSecretName` mints short-lived installation tokens.
+2. Confirm Cilium 1.20.1 ListenerSet CRD is installed and the operator has
+   detected it. Cilium documents an operator restart if the CRD was installed
+   afterward. Apply the Gateway patch only after verifying it permits selected
+   PR namespaces and leaves existing listeners and routes intact.
+3. Confirm the actual cluster DNS service IP. The chart's proposed value is
+   `10.96.0.10` from the configured `10.96.0.0/12` service range; it has not
+   been observed live. Confirm CNPG operator, DNS, auth and Gateway traffic
+   through the NetworkPolicies before enabling exposure.
+4. Add an enforced **cluster-wide cap** on active previews. Per-namespace
+   ResourceQuota alone does not limit the number of PR namespaces. The current
+   ApplicationSet has no global cap, so it must remain inactive.
+5. Run a disposable PR end to end: image build, fake contestant login, known
+   sample problem, cert-manager HTTP-01 first issuance, TLS ListenerSet
+   Accepted/Programmed, auth redirect and malicious-header tests, commit
+   update/migration, label removal, PR close, Application/namespace/PVC teardown.
+   Verify Pod health and HTTP response before posting any Ready comment.
+6. Only after these gates pass, add the ApplicationSet to
+   `manifest/envs/dev/kustomization.yaml` and explicitly set exposure true in
+   its fixed Helm parameters. No new Cloudflare key or DNS change is expected.
 
-The ApplicationSet reads only `number` and `head_sha` from the PR generator.
-Its repo, project, chart path and destination server are fixed. A removed
-label or closed PR removes the generated Application; its finalizer is intended
-to prune the namespace and namespaced resources. This teardown needs live
-verification before activation. The chart's ResourceQuota limits CPU, memory,
-storage and pod count per preview, but a separate cap on concurrent preview
-count is still required.
-
-The image workflow lives in `ictsc-regalia`. PR code builds with read-only
-permissions and produces OCI archives. A trusted `workflow_run` job checks the
-run and current PR state and publishes fixed image names tagged with PR number
-and full head SHA. The publisher never checks out PR code. Only same-repository
-PRs are accepted for now; fork PRs fail closed. The publisher's tag immutability
-and lifecycle races need a real workflow run before activation.
-
-## Validation before merge
-
-Run `helm template preview manifest/base/apps/regalia/pr-preview --set
-prNumber=123 --set headSHA=<40 lowercase hex digits>` and validate the output
-against the dev cluster API. Run `kustomize build manifest/envs/dev` and confirm
-that neither the new ApplicationSet nor any new route is active. Inspect the
-GitHub Actions workflow runs and publish an image from a disposable labeled PR.
-Do not infer URL readiness from a successful image build.
+Cilium ListenerSet behavior is documented in its
+[v1.20.1 guide](https://github.com/cilium/cilium/blob/v1.20.1/Documentation/network/servicemesh/gateway-api/listenerset.rst).
+The [Argo CD PR generator documentation](https://argo-cd.readthedocs.io/en/latest/operator-manual/applicationset/Generators-Pull-Request/)
+describes `appSecretName`, `head_sha` and label-driven removal.

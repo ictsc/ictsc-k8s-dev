@@ -29,9 +29,7 @@ spec:
           owner: ictsc
           repo: ictsc-regalia
           labels: [preview]
-          tokenRef:
-            secretName: regalia-pr-preview-github
-            key: token
+          appSecretName: regalia-pr-preview-github-app
         requeueAfterSeconds: 60
   template:
     metadata:

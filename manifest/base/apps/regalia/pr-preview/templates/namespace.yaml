@@ -4,3 +4,4 @@ metadata:
   name: regalia-pr-{{ .Values.prNumber }}
   labels:
     app.kubernetes.io/part-of: regalia-pr-preview
+    gateway-access: "true"

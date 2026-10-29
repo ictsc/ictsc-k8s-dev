@@ -94,6 +94,9 @@ spec:
           command: [sh, -c, "touch /runtime/runtime-config.js"]
           volumeMounts:
             - {name: runtime-config, mountPath: /runtime}
+          resources:
+            requests: {cpu: 10m, memory: 16Mi}
+            limits: {cpu: 100m, memory: 32Mi}
           securityContext:
             allowPrivilegeEscalation: false
             capabilities: {drop: [ALL]}
@@ -105,7 +108,7 @@ spec:
               containerPort: 8080
           env:
             - {name: API_UPSTREAM, value: "http://preview-backend:8080"}
-            - {name: NGINX_RESOLVER, value: "127.0.0.1"}
+            - {name: NGINX_RESOLVER, value: "{{ .Values.clusterDNSIP }}"}
             - {name: ICTSC_DEMO_MODE, value: "true"}
           volumeMounts:
             - {name: runtime-config, mountPath: /var/www/contestant/runtime-config.js, subPath: runtime-config.js}

@@ -1,13 +1,3 @@
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: preview-migrations
-data:
-  0001_init.sql: |
-{{ .Files.Get "files/0001_init.sql" | indent 4 }}
-  0002_team_color.sql: |
-{{ .Files.Get "files/0002_team_color.sql" | indent 4 }}
----
 apiVersion: batch/v1
 kind: Job
 metadata:
@@ -20,6 +10,8 @@ spec:
   backoffLimit: 3
   activeDeadlineSeconds: 600
   template:
+    metadata:
+      labels: {app: preview-migrate}
     spec:
       restartPolicy: Never
       automountServiceAccountToken: false
@@ -27,20 +19,50 @@ spec:
         runAsNonRoot: true
         runAsUser: 65532
         runAsGroup: 65532
+        fsGroup: 65532
         seccompProfile: {type: RuntimeDefault}
+      initContainers:
+        - name: collect-pr-sql
+          image: ghcr.io/ictsc/ictsc-regalia/migrations:pr-{{ .Values.prNumber }}-{{ .Values.headSHA }}
+          command: [sh, -ec]
+          args: ["cp /migrations/[0-9]*.sql /bundle/; cp /migrations/seed-dev.sql /bundle/"]
+          volumeMounts:
+            - {name: bundle, mountPath: /bundle}
+          resources:
+            requests: {cpu: 25m, memory: 32Mi}
+            limits: {cpu: 100m, memory: 128Mi}
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: {drop: [ALL]}
       containers:
         - name: migrate
-          image: postgres:16
+          image: postgres:16-alpine
           command: [/bin/sh, -ec]
           args:
             - |
+              set -eu
               until pg_isready; do sleep 2; done
-              if [ "$(psql -XAtqc "SELECT to_regclass('public.teams') IS NOT NULL")" = f ]; then
-                psql -X -v ON_ERROR_STOP=1 -f /migrations/0001_init.sql
-              fi
-              if [ "$(psql -XAtqc "SELECT EXISTS (SELECT FROM information_schema.columns WHERE table_schema='public' AND table_name='teams' AND column_name='color')")" = f ]; then
-                psql -X -v ON_ERROR_STOP=1 -f /migrations/0002_team_color.sql
-              fi
+              psql -X -v ON_ERROR_STOP=1 -c 'CREATE TABLE IF NOT EXISTS preview_schema_migrations (name text PRIMARY KEY, checksum text NOT NULL)'
+              for file in /bundle/[0-9]*.sql; do
+                [ -f "$file" ] || { echo 'no migrations' >&2; exit 1; }
+                name=${file##*/}
+                case "$name" in *[!a-zA-Z0-9_.-]*) echo 'bad migration name' >&2; exit 1;; esac
+                checksum=$(sha256sum "$file" | cut -d' ' -f1)
+                stored=$(psql -X -v ON_ERROR_STOP=1 -Atqc "SELECT checksum FROM preview_schema_migrations WHERE name = '$name'")
+                if [ -n "$stored" ]; then
+                  [ "$stored" = "$checksum" ] || { echo "migration changed: $name" >&2; exit 1; }
+                  continue
+                fi
+                psql -X -v ON_ERROR_STOP=1 -f "$file"
+                psql -X -v ON_ERROR_STOP=1 -c "INSERT INTO preview_schema_migrations(name, checksum) VALUES ('$name', '$checksum')"
+              done
+              seeded=$(psql -X -v ON_ERROR_STOP=1 -Atqc 'SELECT EXISTS (SELECT FROM teams)')
+              case "$seeded" in
+                t) ;;
+                f) psql -X -v ON_ERROR_STOP=1 -f /bundle/seed-dev.sql ;;
+                *) echo 'seed check failed' >&2; exit 1;;
+              esac
           env:
             - {name: PGHOST, value: preview-db-rw}
             - {name: PGDATABASE, value: ictscore_openapi}
@@ -51,7 +73,7 @@ spec:
               valueFrom:
                 secretKeyRef: {name: preview-db-app, key: password}
           volumeMounts:
-            - {name: migrations, mountPath: /migrations, readOnly: true}
+            - {name: bundle, mountPath: /bundle, readOnly: true}
           resources:
             requests: {cpu: 25m, memory: 128Mi}
             limits: {cpu: 500m, memory: 1Gi}
@@ -60,5 +82,4 @@ spec:
             readOnlyRootFilesystem: true
             capabilities: {drop: [ALL]}
       volumes:
-        - name: migrations
-          configMap: {name: preview-migrations}
+        - {name: bundle, emptyDir: {}}

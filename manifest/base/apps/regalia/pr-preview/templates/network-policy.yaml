@@ -1,0 +1,106 @@
+# PR-controlled containers can reach only their own database, Valkey, DNS,
+# and the trusted in-namespace services required to serve the preview.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata: {name: preview-backend}
+spec:
+  podSelector: {matchLabels: {app: preview-backend}}
+  policyTypes: [Ingress, Egress]
+  ingress:
+    - from:
+        - podSelector: {matchLabels: {app: preview-frontend}}
+        - podSelector: {matchLabels: {app: preview-proxy}}
+      ports: [{protocol: TCP, port: 8080}]
+  egress:
+    - to:
+        - podSelector: {matchLabels: {cnpg.io/cluster: preview-db}}
+      ports: [{protocol: TCP, port: 5432}]
+    - to:
+        - podSelector: {matchLabels: {app: preview-valkey}}
+      ports: [{protocol: TCP, port: 6379}]
+    - to:
+        - namespaceSelector: {matchLabels: {kubernetes.io/metadata.name: kube-system}}
+      ports: [{protocol: UDP, port: 53}, {protocol: TCP, port: 53}]
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata: {name: preview-frontend}
+spec:
+  podSelector: {matchLabels: {app: preview-frontend}}
+  policyTypes: [Ingress, Egress]
+  ingress:
+    - from:
+        - podSelector: {matchLabels: {app: preview-proxy}}
+      ports: [{protocol: TCP, port: 8080}]
+  egress:
+    - to:
+        - podSelector: {matchLabels: {app: preview-backend}}
+      ports: [{protocol: TCP, port: 8080}]
+    - to:
+        - namespaceSelector: {matchLabels: {kubernetes.io/metadata.name: kube-system}}
+      ports: [{protocol: UDP, port: 53}, {protocol: TCP, port: 53}]
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata: {name: preview-migrate}
+spec:
+  podSelector: {matchLabels: {app: preview-migrate}}
+  policyTypes: [Ingress, Egress]
+  ingress: []
+  egress:
+    - to:
+        - podSelector: {matchLabels: {cnpg.io/cluster: preview-db}}
+      ports: [{protocol: TCP, port: 5432}]
+    - to:
+        - namespaceSelector: {matchLabels: {kubernetes.io/metadata.name: kube-system}}
+      ports: [{protocol: UDP, port: 53}, {protocol: TCP, port: 53}]
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata: {name: preview-valkey}
+spec:
+  podSelector: {matchLabels: {app: preview-valkey}}
+  policyTypes: [Ingress, Egress]
+  ingress:
+    - from:
+        - podSelector: {matchLabels: {app: preview-backend}}
+      ports: [{protocol: TCP, port: 6379}]
+  egress: []
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata: {name: preview-db}
+spec:
+  podSelector: {matchLabels: {cnpg.io/cluster: preview-db}}
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - podSelector: {matchLabels: {app: preview-backend}}
+        - podSelector: {matchLabels: {app: preview-migrate}}
+        - podSelector: {matchLabels: {cnpg.io/cluster: preview-db}}
+        - namespaceSelector: {matchLabels: {kubernetes.io/metadata.name: cnpg-system}}
+      ports: [{protocol: TCP, port: 5432}, {protocol: TCP, port: 8000}]
+{{- if .Values.enableExposure }}
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata: {name: preview-proxy}
+spec:
+  podSelector: {matchLabels: {app: preview-proxy}}
+  policyTypes: [Ingress, Egress]
+  ingress:
+    - from:
+        - namespaceSelector: {matchLabels: {kubernetes.io/metadata.name: gateway}}
+      ports: [{protocol: TCP, port: 8080}]
+  egress:
+    - to:
+        - podSelector: {matchLabels: {app: preview-frontend}}
+        - podSelector: {matchLabels: {app: preview-backend}}
+      ports: [{protocol: TCP, port: 8080}]
+    - to:
+        - namespaceSelector: {matchLabels: {kubernetes.io/metadata.name: oauth2-proxy}}
+      ports: [{protocol: TCP, port: 80}]
+    - to:
+        - namespaceSelector: {matchLabels: {kubernetes.io/metadata.name: kube-system}}
+      ports: [{protocol: UDP, port: 53}, {protocol: TCP, port: 53}]
+{{- end }}
