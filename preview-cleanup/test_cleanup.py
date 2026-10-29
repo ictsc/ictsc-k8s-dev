@@ -5,13 +5,14 @@ import cleanup
 from cleanup import eligible_numbers, obsolete_owned_apps, still_ineligible
 
 
-def app(number, *, owner="owner-uid", name=None):
+def app(number, *, owner="owner-uid", name=None, controller=True):
     return {"metadata": {"name": name or f"regalia-pr-{number}",
                          "namespace": "regalia-preview-control",
                          "uid": f"app-{number}", "resourceVersion": "12",
                          "ownerReferences": [{"apiVersion": "argoproj.io/v1alpha1",
                                               "kind": "ApplicationSet",
-                                              "name": "regalia-pr-preview", "uid": owner}]}}
+                                              "name": "regalia-pr-preview", "uid": owner,
+                                              "controller": controller}]}}
 
 
 def pull(number, *, state="open", preview=True):
@@ -37,11 +38,44 @@ class CleanupTests(unittest.TestCase):
 
     def test_only_obsolete_owned_preview_apps_selected(self):
         apps = [app(1), app(2), app(3), app(4), app(5, owner="other"),
-                app(6, name="unrelated-6"),
+                app(6, name="unrelated-6"), app(8, controller=False),
                 {**app(7), "metadata": {**app(7)["metadata"],
                                          "namespace": "argocd"}}]
         self.assertEqual([n for n, _ in obsolete_owned_apps(apps, "owner-uid", {1, 3, 4})],
                          [2])
+
+    def test_deleting_application_with_finalizer_is_retried_not_force_removed(self):
+        current = app(1)
+        current["metadata"]["finalizers"] = ["resources-finalizer.argocd.argoproj.io"]
+        deletes = []
+        def github(url, **kwargs):
+            if "/pulls?" in url:
+                return [pull(2), pull(3), pull(4)]
+            if url.endswith("/pulls/1"):
+                return pull(1, state="closed")
+            raise AssertionError(url)
+        def kube(path, **kwargs):
+            if path.endswith("/applicationsets/regalia-pr-preview"):
+                return {"metadata": {"uid": "owner-uid"}}
+            if "/applications?" in path:
+                return {"items": [current, app(2), app(3)], "metadata": {}}
+            if kwargs.get("method") == "DELETE":
+                deletes.append(kwargs["body"]["preconditions"])
+                current["metadata"]["deletionTimestamp"] = "2026-10-29T15:44:07Z"
+                current["metadata"]["resourceVersion"] = "13"
+                return {"kind": "Status", "status": "Success"}
+            raise AssertionError(path)
+        with patch.object(cleanup, "github_token", return_value="gh-token"), \
+                patch.dict(cleanup.os.environ, {"GITHUB_APP_ID": "1",
+                                             "GITHUB_APP_INSTALLATION_ID": "2",
+                                             "GITHUB_APP_PRIVATE_KEY": "test"}), \
+                patch("builtins.open", mock_open(read_data="sa-token")):
+            cleanup.run(kube, github)
+            cleanup.run(kube, github)
+        self.assertEqual(deletes, [{"uid": "app-1", "resourceVersion": "12"},
+                                   {"uid": "app-1", "resourceVersion": "13"}])
+        self.assertEqual(current["metadata"]["finalizers"],
+                         ["resources-finalizer.argocd.argoproj.io"])
 
     def test_recheck_prevents_deletion_after_relabel(self):
         self.assertFalse(still_ineligible(2, "token",
