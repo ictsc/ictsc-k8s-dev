@@ -1,0 +1,138 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: preview-backend
+  annotations:
+    argocd.argoproj.io/sync-wave: "2"
+spec:
+  replicas: 1
+  selector:
+    matchLabels: {app: preview-backend}
+  template:
+    metadata:
+      labels: {app: preview-backend}
+    spec:
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile: {type: RuntimeDefault}
+      containers:
+        - name: backend
+          image: ghcr.io/ictsc/ictsc-regalia/backend:pr-{{ .Values.prNumber }}-{{ .Values.headSHA }}
+          ports:
+            - name: http
+              containerPort: 8080
+          env:
+            - name: PGUSER
+              valueFrom:
+                secretKeyRef: {name: preview-db-app, key: username}
+            - name: PGPASSWORD
+              valueFrom:
+                secretKeyRef: {name: preview-db-app, key: password}
+            - name: ICTSC_API_ADDRESS
+              value: :8080
+            - name: ICTSC_DATABASE_URL
+              value: postgresql://preview-db-rw:5432/ictscore_openapi?sslmode=require
+            - name: ICTSC_REDIS_URL
+              value: redis://preview-valkey:6379/0
+            - name: ICTSC_DEV_FAKE_MODE
+              value: "true"
+            - name: ICTSC_SECURE_COOKIES
+              value: "true"
+            - name: ICTSC_ALLOWED_ORIGINS
+              value: https://pr-{{ .Values.prNumber }}.k8s-dev.ictsc.net
+            - name: ICTSC_DISCORD_CONTESTANT_REDIRECT_URI
+              value: https://pr-{{ .Values.prNumber }}.k8s-dev.ictsc.net/api/v1/auth/discord/callback
+            - name: ICTSC_DISCORD_ADMIN_REDIRECT_URI
+              value: https://pr-{{ .Values.prNumber }}.k8s-dev.ictsc.net/api/v1/admin/auth/discord/callback
+            - {name: ICTSC_DISCORD_ADMIN_GUILD_ID, value: "900000000000000000"}
+            - {name: ICTSC_DISCORD_ADMIN_ROLE_IDS, value: "900000000000000003"}
+          readinessProbe:
+            httpGet: {path: /api/v1/health, port: http}
+          resources:
+            requests: {cpu: 50m, memory: 64Mi}
+            limits: {cpu: 500m, memory: 256Mi}
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: {drop: [ALL]}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: preview-backend
+spec:
+  selector: {app: preview-backend}
+  ports:
+    - port: 8080
+      targetPort: http
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: preview-frontend
+  annotations:
+    argocd.argoproj.io/sync-wave: "2"
+spec:
+  replicas: 1
+  selector:
+    matchLabels: {app: preview-frontend}
+  template:
+    metadata:
+      labels: {app: preview-frontend}
+    spec:
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        runAsGroup: 10001
+        fsGroup: 10001
+        seccompProfile: {type: RuntimeDefault}
+      initContainers:
+        - name: runtime-config
+          image: ghcr.io/ictsc/ictsc-regalia/frontend:pr-{{ .Values.prNumber }}-{{ .Values.headSHA }}
+          command: [sh, -c, "touch /runtime/runtime-config.js"]
+          volumeMounts:
+            - {name: runtime-config, mountPath: /runtime}
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities: {drop: [ALL]}
+      containers:
+        - name: frontend
+          image: ghcr.io/ictsc/ictsc-regalia/frontend:pr-{{ .Values.prNumber }}-{{ .Values.headSHA }}
+          ports:
+            - name: http
+              containerPort: 8080
+          env:
+            - {name: API_UPSTREAM, value: "http://preview-backend:8080"}
+            - {name: NGINX_RESOLVER, value: "127.0.0.1"}
+            - {name: ICTSC_DEMO_MODE, value: "true"}
+          volumeMounts:
+            - {name: runtime-config, mountPath: /var/www/contestant/runtime-config.js, subPath: runtime-config.js}
+            - {name: nginx-cache, mountPath: /var/cache/nginx}
+            - {name: nginx-run, mountPath: /var/run}
+            - {name: nginx-conf, mountPath: /etc/nginx/conf.d}
+          readinessProbe:
+            httpGet: {path: /healthz, port: http}
+          resources:
+            requests: {cpu: 25m, memory: 32Mi}
+            limits: {cpu: 250m, memory: 128Mi}
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: {drop: [ALL]}
+      volumes:
+        - {name: runtime-config, emptyDir: {}}
+        - {name: nginx-cache, emptyDir: {}}
+        - {name: nginx-run, emptyDir: {}}
+        - {name: nginx-conf, emptyDir: {}}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: preview-frontend
+spec:
+  selector: {app: preview-frontend}
+  ports:
+    - port: 8080
+      targetPort: http

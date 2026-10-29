@@ -1,0 +1,63 @@
+# Deliberately absent from envs/dev/kustomization.yaml until the auth and HTTPS
+# boundary documented in docs/regalia-pr-preview.md has been validated.
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: regalia-pr-preview
+  namespace: argocd
+spec:
+  sourceRepos:
+    - git@github.com:ictsc/ictsc-k8s-dev.git
+  destinations:
+    - server: https://kubernetes.default.svc
+      namespace: regalia-pr-*
+  clusterResourceWhitelist:
+    - group: ""
+      kind: Namespace
+---
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: regalia-pr-preview
+  namespace: argocd
+spec:
+  goTemplate: true
+  goTemplateOptions: [missingkey=error]
+  generators:
+    - pullRequest:
+        github:
+          owner: ictsc
+          repo: ictsc-regalia
+          labels: [preview]
+          tokenRef:
+            secretName: regalia-pr-preview-github
+            key: token
+        requeueAfterSeconds: 60
+  template:
+    metadata:
+      name: 'regalia-pr-{{.number}}'
+      namespace: argocd
+      finalizers:
+        - resources-finalizer.argocd.argoproj.io
+    spec:
+      project: regalia-pr-preview
+      source:
+        repoURL: git@github.com:ictsc/ictsc-k8s-dev.git
+        targetRevision: refs/heads/main
+        path: manifest/base/apps/regalia/pr-preview
+        helm:
+          parameters:
+            - name: prNumber
+              value: '{{.number}}'
+            - name: headSHA
+              value: '{{.head_sha}}'
+      destination:
+        server: https://kubernetes.default.svc
+        namespace: 'regalia-pr-{{.number}}'
+      syncPolicy:
+        automated:
+          prune: true
+          selfHeal: true
+        syncOptions:
+          - CreateNamespace=true
+          - ServerSideApply=true

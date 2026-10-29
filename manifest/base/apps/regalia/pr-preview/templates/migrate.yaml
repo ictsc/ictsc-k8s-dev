@@ -1,0 +1,64 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: preview-migrations
+data:
+  0001_init.sql: |
+{{ .Files.Get "files/0001_init.sql" | indent 4 }}
+  0002_team_color.sql: |
+{{ .Files.Get "files/0002_team_color.sql" | indent 4 }}
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: preview-migrate
+  annotations:
+    argocd.argoproj.io/hook: Sync
+    argocd.argoproj.io/sync-wave: "1"
+    argocd.argoproj.io/hook-delete-policy: BeforeHookCreation,HookSucceeded
+spec:
+  backoffLimit: 3
+  activeDeadlineSeconds: 600
+  template:
+    spec:
+      restartPolicy: Never
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65532
+        runAsGroup: 65532
+        seccompProfile: {type: RuntimeDefault}
+      containers:
+        - name: migrate
+          image: postgres:16
+          command: [/bin/sh, -ec]
+          args:
+            - |
+              until pg_isready; do sleep 2; done
+              if [ "$(psql -XAtqc "SELECT to_regclass('public.teams') IS NOT NULL")" = f ]; then
+                psql -X -v ON_ERROR_STOP=1 -f /migrations/0001_init.sql
+              fi
+              if [ "$(psql -XAtqc "SELECT EXISTS (SELECT FROM information_schema.columns WHERE table_schema='public' AND table_name='teams' AND column_name='color')")" = f ]; then
+                psql -X -v ON_ERROR_STOP=1 -f /migrations/0002_team_color.sql
+              fi
+          env:
+            - {name: PGHOST, value: preview-db-rw}
+            - {name: PGDATABASE, value: ictscore_openapi}
+            - name: PGUSER
+              valueFrom:
+                secretKeyRef: {name: preview-db-app, key: username}
+            - name: PGPASSWORD
+              valueFrom:
+                secretKeyRef: {name: preview-db-app, key: password}
+          volumeMounts:
+            - {name: migrations, mountPath: /migrations, readOnly: true}
+          resources:
+            requests: {cpu: 25m, memory: 128Mi}
+            limits: {cpu: 500m, memory: 1Gi}
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: {drop: [ALL]}
+      volumes:
+        - name: migrations
+          configMap: {name: preview-migrations}
