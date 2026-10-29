@@ -1,0 +1,4 @@
+apiVersion: v2
+name: regalia-pr-preview
+version: 0.1.0
+description: Isolated, non-public PR preview workload

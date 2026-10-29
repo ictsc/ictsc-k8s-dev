@@ -1,0 +1,5 @@
+prNumber: 0
+headSHA: ""
+enableExposure: false
+proxyImage: ghcr.io/ictsc/ictsc-k8s-dev/regalia-preview-proxy:main
+clusterDNSIP: 10.96.0.10

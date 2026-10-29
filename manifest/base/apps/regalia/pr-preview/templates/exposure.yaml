@@ -1,0 +1,113 @@
+{{- if .Values.enableExposure }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: preview-proxy
+  annotations:
+    argocd.argoproj.io/sync-wave: "3"
+spec:
+  replicas: 1
+  selector:
+    matchLabels: {app: preview-proxy}
+  template:
+    metadata:
+      labels: {app: preview-proxy}
+    spec:
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile: {type: RuntimeDefault}
+      containers:
+        - name: proxy
+          image: {{ .Values.proxyImage }}
+          ports:
+            - {name: http, containerPort: 8080}
+          env:
+            - {name: PREVIEW_HOST, value: "pr-{{ .Values.prNumber }}.k8s-dev.ictsc.net"}
+          readinessProbe:
+            tcpSocket: {port: http}
+          resources:
+            requests: {cpu: 25m, memory: 32Mi}
+            limits: {cpu: 250m, memory: 128Mi}
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: {drop: [ALL]}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: preview-proxy
+spec:
+  selector: {app: preview-proxy}
+  ports:
+    - {port: 8080, targetPort: http}
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: preview
+  annotations:
+    argocd.argoproj.io/sync-wave: "3"
+spec:
+  secretName: preview-tls
+  issuerRef:
+    name: letsencrypt
+    kind: ClusterIssuer
+  dnsNames:
+    - pr-{{ .Values.prNumber }}.k8s-dev.ictsc.net
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: ListenerSet
+metadata:
+  name: preview
+  annotations:
+    argocd.argoproj.io/sync-wave: "3"
+spec:
+  parentRef:
+    name: external
+    namespace: gateway
+  listeners:
+    - name: https
+      hostname: pr-{{ .Values.prNumber }}.k8s-dev.ictsc.net
+      protocol: HTTPS
+      port: 443
+      tls:
+        mode: Terminate
+        certificateRefs:
+          - {name: preview-tls}
+      allowedRoutes:
+        namespaces:
+          from: Same
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: preview
+  annotations:
+    argocd.argoproj.io/sync-wave: "4"
+spec:
+  parentRefs:
+    - {group: gateway.networking.k8s.io, kind: ListenerSet, name: preview, sectionName: https}
+  hostnames:
+    - pr-{{ .Values.prNumber }}.k8s-dev.ictsc.net
+  rules:
+    - backendRefs:
+        - {name: preview-proxy, port: 8080}
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: preview-http-redirect
+  annotations:
+    argocd.argoproj.io/sync-wave: "4"
+spec:
+  parentRefs:
+    - {name: external, namespace: gateway, sectionName: http}
+  hostnames:
+    - pr-{{ .Values.prNumber }}.k8s-dev.ictsc.net
+  rules:
+    - filters:
+        - type: RequestRedirect
+          requestRedirect: {scheme: https, statusCode: 301}
+{{- end }}

@@ -1,0 +1,3 @@
+{{- if or (lt (int .Values.prNumber) 1) (not (regexMatch "^[a-f0-9]{40}$" .Values.headSHA)) -}}
+{{- fail "prNumber and full headSHA are required" -}}
+{{- end -}}
