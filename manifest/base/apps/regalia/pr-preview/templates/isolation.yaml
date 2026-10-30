@@ -48,6 +48,11 @@ spec:
       labels: {app: preview-valkey}
     spec:
       automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 999
+        runAsGroup: 999
+        seccompProfile: {type: RuntimeDefault}
       containers:
         - name: valkey
           image: valkey/valkey:8.1.4-alpine
