@@ -9,6 +9,10 @@ resources:
   - ./resources/cilium-lb-ip-pool.yaml
   - ./resources/cilium-l2-announcement.yaml
   - ./resources/gateway.yaml
+  - ./resources/regalia-pr-preview.yaml
+  - ./resources/regalia-preview-secretstore.yaml
+  - ./resources/regalia-preview-controller.yaml
+  - ../../base/apps/regalia/pr-preview/activation
   - ./resources/cluster-issuer.yaml
   - ./resources/storageclass-nfs.yaml
   - ./resources/storageclass-longhorn-single-replica.yaml
@@ -21,6 +25,20 @@ resources:
   - ./resources/opentelemetry-alerts.yaml
 
 patches:
+  - patch: |-
+      apiVersion: gateway.networking.k8s.io/v1
+      kind: Gateway
+      metadata:
+        name: external
+        namespace: gateway
+      spec:
+        allowedListeners:
+          namespaces:
+            from: Selector
+            selector:
+              matchLabels:
+                app.kubernetes.io/part-of: regalia-pr-preview
+                gateway-access: "true"
   # Preview branch is pinned explicitly; do not follow main images.
   - patch: |-
       $patch: delete

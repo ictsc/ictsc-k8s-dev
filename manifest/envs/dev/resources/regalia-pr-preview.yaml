@@ -1,11 +1,10 @@
-# Deliberately absent from envs/dev/kustomization.yaml until the auth and HTTPS
-# boundary documented in docs/regalia-pr-preview.md has been validated.
+# #3500 remains managed by its temporary AppSet, so reserve one of three slots.
 apiVersion: v1
 kind: Namespace
 metadata:
   name: regalia-preview-control
   annotations:
-    argocd.argoproj.io/sync-wave: "-5"
+    argocd.argoproj.io/sync-wave: "20"
 ---
 apiVersion: v1
 kind: ResourceQuota
@@ -13,12 +12,12 @@ metadata:
   name: preview-applications
   namespace: regalia-preview-control
   annotations:
-    argocd.argoproj.io/sync-wave: "-4"
+    argocd.argoproj.io/sync-wave: "21"
 spec:
   hard:
     # Kubernetes quota admission serializes concurrent creates. Existing
     # Application objects keep their slot until PR removal deletes them.
-    count/applications.argoproj.io: "3"
+    count/applications.argoproj.io: "2"
     count/applicationsets.argoproj.io: "1"
 ---
 apiVersion: argoproj.io/v1alpha1
@@ -27,7 +26,26 @@ metadata:
   name: regalia-pr-preview
   namespace: argocd
   annotations:
-    argocd.argoproj.io/sync-wave: "-3"
+    argocd.argoproj.io/sync-wave: "23"
+spec:
+  sourceNamespaces:
+    - regalia-preview-control
+  sourceRepos:
+    - git@github.com:ictsc/ictsc-k8s-dev.git
+  destinations:
+    - server: https://kubernetes.default.svc
+      namespace: regalia-pr-*
+  clusterResourceWhitelist:
+    - group: ""
+      kind: Namespace
+---
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: regalia-pr-preview
+  namespace: regalia-preview-control
+  annotations:
+    argocd.argoproj.io/sync-wave: "23"
 spec:
   sourceNamespaces:
     - regalia-preview-control
@@ -46,7 +64,7 @@ metadata:
   name: regalia-pr-preview
   namespace: regalia-preview-control
   annotations:
-    argocd.argoproj.io/sync-wave: "-2"
+    argocd.argoproj.io/sync-wave: "100"
 spec:
   goTemplate: true
   goTemplateOptions: [missingkey=error]
@@ -71,12 +89,17 @@ spec:
         targetRevision: refs/heads/main
         path: manifest/base/apps/regalia/pr-preview
         helm:
+          valuesObject:
+            enableExposure: true
           parameters:
             - name: prNumber
               value: '{{.number}}'
               forceString: true
             - name: headSHA
               value: '{{.head_sha}}'
+              forceString: true
+            - name: proxyImage
+              value: ghcr.io/ictsc/ictsc-k8s-dev/regalia-preview-proxy@sha256:c53d311abc475b3fe060110e7d515a0a16b6999903d3aa705c7374468815f345
               forceString: true
       destination:
         server: https://kubernetes.default.svc

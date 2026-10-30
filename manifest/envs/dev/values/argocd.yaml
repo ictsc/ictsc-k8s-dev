@@ -15,6 +15,9 @@ configs:
         - email
         - groups
   params:
+    # Only Applications sourced from the dedicated preview control namespace.
+    # The shared ApplicationSet controller stays in argocd-only mode.
+    application.namespaces: regalia-preview-control
     # Gateway との TLS 終端後のリダイレクトループを防ぐ。
     server.insecure: true
 

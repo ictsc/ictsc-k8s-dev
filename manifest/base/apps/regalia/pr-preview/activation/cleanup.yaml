@@ -1,10 +1,11 @@
-# Inactive: apply only after the GitHub App credential, image, Argo RBAC and
-# saturated lifecycle test have been reviewed. The dev kustomization omits it.
+# Delete only obsolete Applications owned by the permanent control AppSet.
 apiVersion: v1
 kind: ServiceAccount
 metadata:
   name: regalia-preview-cleanup
   namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "22"
 automountServiceAccountToken: true
 ---
 apiVersion: rbac.authorization.k8s.io/v1
@@ -12,6 +13,8 @@ kind: Role
 metadata:
   name: regalia-preview-cleanup
   namespace: regalia-preview-control
+  annotations:
+    argocd.argoproj.io/sync-wave: "22"
 rules:
   - apiGroups: [argoproj.io]
     resources: [applications]
@@ -26,6 +29,8 @@ kind: RoleBinding
 metadata:
   name: regalia-preview-cleanup
   namespace: regalia-preview-control
+  annotations:
+    argocd.argoproj.io/sync-wave: "22"
 subjects:
   - kind: ServiceAccount
     name: regalia-preview-cleanup
@@ -40,6 +45,8 @@ kind: CronJob
 metadata:
   name: regalia-preview-cleanup
   namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "25"
 spec:
   schedule: '* * * * *'
   concurrencyPolicy: Forbid
@@ -61,8 +68,8 @@ spec:
               type: RuntimeDefault
           containers:
             - name: cleanup
-              image: ghcr.io/ictsc/ictsc-k8s-dev/regalia-preview-cleanup:main
-              imagePullPolicy: Always
+              image: ghcr.io/ictsc/ictsc-k8s-dev/regalia-preview-cleanup@sha256:af5e5d4eb48ecbab2b2232d3a710dc811129ae4f3273251db5bc1fd02db558f8
+              imagePullPolicy: IfNotPresent
               env:
                 - name: GITHUB_APP_ID
                   valueFrom:
