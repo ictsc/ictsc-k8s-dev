@@ -66,6 +66,34 @@ The live finalizer/PVC check below used a separate Application in `argocd`.
 The separate Argo CD any-namespace settings in
 `activation/argocd-namespace-values.yaml` are **not loaded** by dev.
 
+## Controlled dev smoke test (2026-10-30)
+
+An isolated AppSet and AppProject in the existing `argocd` namespace selected
+only the disposable Regalia PR #3499. The trusted publisher built and pushed
+backend, frontend, and migrations images. The generated Application created a
+CNPG database, 1Gi Longhorn PVC, Valkey, and app workloads. With exposure
+enabled for this PR only, cert-manager issued a valid certificate; the
+ListenerSet and routes were accepted, HTTP redirected to HTTPS, and
+unauthenticated HTTPS requests redirected to the existing Dex login flow.
+Authenticated page rendering was **not verified** because the browser reached a
+Dex consent screen requiring user action. The test did not activate the
+permanent three-Application quota or cleanup CronJob.
+
+Two container startup failures required live test-only numeric UID patches:
+Valkey's entrypoint called `setpriv` and failed `setresuid` with all capabilities
+dropped until the pod ran as UID/GID 999; the proxy image declared the
+non-numeric `nonroot` user, so kubelet could not prove `runAsNonRoot` until the
+pod ran as UID/GID 65532. The chart and proxy Dockerfile now set these numeric
+IDs. A second publish run for the same PR head failed closed on an OCI digest
+mismatch after two label events started separate builds; this needs a separate
+publisher workflow fix and must not be solved by weakening digest comparison.
+
+After the test, PR #3499 was closed and unlabeled. Its Application, namespace,
+PVC, PV, and Longhorn volume were removed by normal Argo finalizer cleanup.
+The temporary AppSet, AppProject, Gateway allowance, and publisher variable
+were removed; existing Argo applications returned to Synced/Healthy. Published
+OCI images remain in GHCR.
+
 ## Trust boundary
 
 `ictsc-regalia` builds backend, frontend, and migrations OCI artifacts in a

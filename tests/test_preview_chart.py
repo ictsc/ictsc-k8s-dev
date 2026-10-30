@@ -29,6 +29,20 @@ class ChartTests(unittest.TestCase):
         self.assertEqual(routes[0]["spec"]["rules"][0]["backendRefs"][0]["name"], "preview-proxy")
         self.assertTrue(any(d["kind"] == "ListenerSet" for d in docs))
 
+    def test_preview_containers_start_with_numeric_nonroot_users(self):
+        docs = self.render(True)
+        deployments = {d["metadata"]["name"]: d for d in docs if d["kind"] == "Deployment"}
+        for name, uid in (("preview-valkey", 999), ("preview-proxy", 65532)):
+            pod = deployments[name]["spec"]["template"]["spec"]
+            security = pod["securityContext"]
+            self.assertTrue(security["runAsNonRoot"])
+            self.assertEqual(security["runAsUser"], uid)
+            self.assertEqual(security["runAsGroup"], uid)
+            self.assertEqual(security["seccompProfile"]["type"], "RuntimeDefault")
+            container_security = pod["containers"][0]["securityContext"]
+            self.assertFalse(container_security["allowPrivilegeEscalation"])
+            self.assertEqual(container_security["capabilities"]["drop"], ["ALL"])
+
     def test_missing_sha_fails(self):
         result = subprocess.run(["helm", "template", "preview", str(CHART), "--set", "prNumber=7"], capture_output=True)
         self.assertNotEqual(result.returncode, 0)
