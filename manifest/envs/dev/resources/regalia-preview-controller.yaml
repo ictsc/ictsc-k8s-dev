@@ -4,7 +4,7 @@ metadata:
   name: regalia-preview-appset-controller
   namespace: regalia-preview-control
   annotations:
-    argocd.argoproj.io/sync-wave: "-28"
+    argocd.argoproj.io/sync-wave: "22"
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
@@ -12,7 +12,7 @@ metadata:
   name: regalia-preview-appset-controller
   namespace: regalia-preview-control
   annotations:
-    argocd.argoproj.io/sync-wave: "-28"
+    argocd.argoproj.io/sync-wave: "22"
 rules:
   - apiGroups: [argoproj.io]
     resources: [applications, applicationsets, applicationsets/finalizers]
@@ -36,7 +36,7 @@ metadata:
   name: regalia-preview-appset-controller
   namespace: regalia-preview-control
   annotations:
-    argocd.argoproj.io/sync-wave: "-28"
+    argocd.argoproj.io/sync-wave: "22"
 subjects:
   - kind: ServiceAccount
     name: regalia-preview-appset-controller
@@ -52,7 +52,7 @@ metadata:
   name: regalia-pr-preview-github-app
   namespace: regalia-preview-control
   annotations:
-    argocd.argoproj.io/sync-wave: "-28"
+    argocd.argoproj.io/sync-wave: "22"
 spec:
   refreshInterval: 1h
   secretStoreRef:
@@ -76,7 +76,7 @@ metadata:
   name: regalia-preview-appset-controller
   namespace: regalia-preview-control
   annotations:
-    argocd.argoproj.io/sync-wave: "-26"
+    argocd.argoproj.io/sync-wave: "24"
 spec:
   replicas: 1
   strategy: {type: Recreate}

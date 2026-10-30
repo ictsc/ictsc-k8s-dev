@@ -34,6 +34,8 @@ class PreviewActivationOrderTests(unittest.TestCase):
 
     def test_secret_and_controller_are_healthy_before_appset(self):
         control = "regalia-preview-control"
+        eso_installer = self.wave("Application", "external-secrets", "argocd")
+        argo_installer = self.wave("Application", "argocd", "argocd")
         namespace = self.wave("Namespace", control)
         quota = self.wave("ResourceQuota", "preview-applications", control)
         service_account = self.wave("ServiceAccount", "regalia-preview-appset-controller", control)
@@ -45,6 +47,10 @@ class PreviewActivationOrderTests(unittest.TestCase):
         deployment = self.wave("Deployment", "regalia-preview-appset-controller", control)
         cleanup = self.wave("CronJob", "regalia-preview-cleanup", "argocd")
         appset = self.wave("ApplicationSet", "regalia-pr-preview", control)
+        # Dev bootstrap installs ESO through an Application. A new store or
+        # ExternalSecret cannot be applied before its CRD/controller exists.
+        self.assertLess(eso_installer, namespace)
+        self.assertLess(argo_installer, namespace)
         self.assertLess(namespace, quota)
         self.assertLessEqual(quota, store)
         self.assertLess(store, min(service_account, role, binding, secret))

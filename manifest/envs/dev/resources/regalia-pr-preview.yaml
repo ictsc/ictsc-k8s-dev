@@ -4,7 +4,7 @@ kind: Namespace
 metadata:
   name: regalia-preview-control
   annotations:
-    argocd.argoproj.io/sync-wave: "-30"
+    argocd.argoproj.io/sync-wave: "20"
 ---
 apiVersion: v1
 kind: ResourceQuota
@@ -12,7 +12,7 @@ metadata:
   name: preview-applications
   namespace: regalia-preview-control
   annotations:
-    argocd.argoproj.io/sync-wave: "-29"
+    argocd.argoproj.io/sync-wave: "21"
 spec:
   hard:
     # Kubernetes quota admission serializes concurrent creates. Existing
@@ -26,7 +26,7 @@ metadata:
   name: regalia-pr-preview
   namespace: argocd
   annotations:
-    argocd.argoproj.io/sync-wave: "-27"
+    argocd.argoproj.io/sync-wave: "23"
 spec:
   sourceNamespaces:
     - regalia-preview-control
@@ -45,7 +45,7 @@ metadata:
   name: regalia-pr-preview
   namespace: regalia-preview-control
   annotations:
-    argocd.argoproj.io/sync-wave: "-27"
+    argocd.argoproj.io/sync-wave: "23"
 spec:
   sourceNamespaces:
     - regalia-preview-control
