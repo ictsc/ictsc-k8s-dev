@@ -9,12 +9,12 @@ live; raise this to three only after #3500 is normally removed. The controller
 does not use Argo CD's multi-namespace ApplicationSet mode or receive
 cluster-wide Secret read permission.
 
-The existing Sakura ClusterSecretStore allows the control namespace so ESO can
-materialize the same read-only GitHub App credential there. This namespace
-admission permits a trusted ExternalSecret author in that namespace to request
-other names from the same vault; do not give PR workloads or untrusted users
-permission to create ExternalSecrets there. The AppSet controller can read
-Secrets only in its own namespace. Existing `argocd` app controller and server
+The dedicated `regalia-preview-github-app-only` ClusterSecretStore admits only
+the control namespace and rejects every remote key except the three existing
+GitHub App credential names before its webhook sends an HTTP request. It uses
+the existing Sakura provider credential by reference; the shared Store and
+its namespace allowlist are unchanged. The AppSet controller can read Secrets
+only in its own namespace. Existing `argocd` app controller and server
 need `application.namespaces: regalia-preview-control` and a controlled restart
 after the Helm values sync; the shared AppSet controller remains unchanged.
 
@@ -24,6 +24,8 @@ from main. Its CronJob only deletes obsolete Applications owned by the
 permanent AppSet; Argo's resources finalizer performs workload and PVC cleanup.
 The Regalia publisher variable must be enabled separately for new head images.
 Until then, a label alone will not produce a new image.
+The AppSet is the final root sync wave: quota-full generation can leave it
+Degraded, so it must not block Argo or other infrastructure prerequisites.
 
 The chart supplies one namespace, dedicated CNPG PostgreSQL and Valkey, quota,
 app, migration Job, and scoped NetworkPolicies per PR. The trusted proxy,

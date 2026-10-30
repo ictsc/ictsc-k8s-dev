@@ -3,12 +3,16 @@ kind: ServiceAccount
 metadata:
   name: regalia-preview-appset-controller
   namespace: regalia-preview-control
+  annotations:
+    argocd.argoproj.io/sync-wave: "-28"
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
   name: regalia-preview-appset-controller
   namespace: regalia-preview-control
+  annotations:
+    argocd.argoproj.io/sync-wave: "-28"
 rules:
   - apiGroups: [argoproj.io]
     resources: [applications, applicationsets, applicationsets/finalizers]
@@ -31,6 +35,8 @@ kind: RoleBinding
 metadata:
   name: regalia-preview-appset-controller
   namespace: regalia-preview-control
+  annotations:
+    argocd.argoproj.io/sync-wave: "-28"
 subjects:
   - kind: ServiceAccount
     name: regalia-preview-appset-controller
@@ -45,11 +51,13 @@ kind: ExternalSecret
 metadata:
   name: regalia-pr-preview-github-app
   namespace: regalia-preview-control
+  annotations:
+    argocd.argoproj.io/sync-wave: "-28"
 spec:
   refreshInterval: 1h
   secretStoreRef:
     kind: ClusterSecretStore
-    name: sakura-secret-manager
+    name: regalia-preview-github-app-only
   target:
     name: regalia-pr-preview-github-app
     creationPolicy: Owner
@@ -67,6 +75,8 @@ kind: Deployment
 metadata:
   name: regalia-preview-appset-controller
   namespace: regalia-preview-control
+  annotations:
+    argocd.argoproj.io/sync-wave: "-26"
 spec:
   replicas: 1
   strategy: {type: Recreate}

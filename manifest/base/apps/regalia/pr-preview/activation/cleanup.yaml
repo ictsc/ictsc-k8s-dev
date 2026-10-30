@@ -4,6 +4,8 @@ kind: ServiceAccount
 metadata:
   name: regalia-preview-cleanup
   namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "-28"
 automountServiceAccountToken: true
 ---
 apiVersion: rbac.authorization.k8s.io/v1
@@ -11,6 +13,8 @@ kind: Role
 metadata:
   name: regalia-preview-cleanup
   namespace: regalia-preview-control
+  annotations:
+    argocd.argoproj.io/sync-wave: "-28"
 rules:
   - apiGroups: [argoproj.io]
     resources: [applications]
@@ -25,6 +29,8 @@ kind: RoleBinding
 metadata:
   name: regalia-preview-cleanup
   namespace: regalia-preview-control
+  annotations:
+    argocd.argoproj.io/sync-wave: "-28"
 subjects:
   - kind: ServiceAccount
     name: regalia-preview-cleanup
@@ -39,6 +45,8 @@ kind: CronJob
 metadata:
   name: regalia-preview-cleanup
   namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "-25"
 spec:
   schedule: '* * * * *'
   concurrencyPolicy: Forbid

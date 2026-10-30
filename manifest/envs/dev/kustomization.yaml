@@ -10,6 +10,7 @@ resources:
   - ./resources/cilium-l2-announcement.yaml
   - ./resources/gateway.yaml
   - ./resources/regalia-pr-preview.yaml
+  - ./resources/regalia-preview-secretstore.yaml
   - ./resources/regalia-preview-controller.yaml
   - ../../base/apps/regalia/pr-preview/activation
   - ./resources/cluster-issuer.yaml
