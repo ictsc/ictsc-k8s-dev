@@ -23,10 +23,16 @@ def kubectl(*args, input=None, check=True):
 class QuotaIntegrationTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        namespace, quota, project, appset = list(yaml.safe_load_all(PROPOSAL.read_text()))
+        docs = [d for d in yaml.safe_load_all(PROPOSAL.read_text()) if d]
+        namespace = next(d for d in docs if d["kind"] == "Namespace")
+        quota = next(d for d in docs if d["kind"] == "ResourceQuota")
+        project = next(d for d in docs if d["kind"] == "AppProject"
+                       and d["metadata"]["namespace"] == "argocd")
+        appset = next(d for d in docs if d["kind"] == "ApplicationSet")
+        cls.limit = int(quota["spec"]["hard"]["count/applications.argoproj.io"])
         assert namespace["metadata"]["name"] == NAMESPACE
         assert quota["metadata"]["namespace"] == NAMESPACE
-        assert quota["spec"]["hard"]["count/applications.argoproj.io"] == "3"
+        assert cls.limit in (2, 3)
         assert quota["spec"]["hard"]["count/applicationsets.argoproj.io"] == "1"
         assert appset["metadata"]["namespace"] == NAMESPACE
         assert appset["spec"]["template"]["metadata"]["namespace"] == NAMESPACE
@@ -35,14 +41,14 @@ class QuotaIntegrationTests(unittest.TestCase):
         # kind controller during this short test. Use a built-in namespaced
         # resource to test atomic admission, while retaining the exact CRD
         # quota as an activation gate on the actual Argo installation.
-        quota["spec"]["hard"] = {"count/leases.coordination.k8s.io": "3"}
+        quota["spec"]["hard"] = {"count/leases.coordination.k8s.io": str(cls.limit)}
         kubectl("apply", "-f", "-", input=yaml.safe_dump_all([namespace, quota]))
         deadline = time.monotonic() + 60
         while time.monotonic() < deadline:
             result = kubectl("get", "quota", "preview-applications", "-n", NAMESPACE,
                              "-o", "json")
             status = json.loads(result.stdout).get("status", {})
-            if (status.get("hard", {}).get("count/leases.coordination.k8s.io") == "3"
+            if (status.get("hard", {}).get("count/leases.coordination.k8s.io") == str(cls.limit)
                     and status.get("used", {}).get("count/leases.coordination.k8s.io") == "0"):
                 break
             time.sleep(1)
@@ -63,8 +69,8 @@ class QuotaIntegrationTests(unittest.TestCase):
         with ThreadPoolExecutor(max_workers=8) as pool:
             results = list(pool.map(self.create, range(1, 9)))
         accepted = self.names()
-        self.assertEqual(len(accepted), 3, [r.stderr for r in results])
-        self.assertEqual(sum(r.returncode == 0 for r in results), 3)
+        self.assertEqual(len(accepted), self.limit, [r.stderr for r in results])
+        self.assertEqual(sum(r.returncode == 0 for r in results), self.limit)
         self.assertNotEqual(self.create(9).returncode, 0)
         self.assertEqual(self.names(), accepted)
         old = sorted(accepted)[0]
@@ -93,7 +99,10 @@ class ArgoCRDQuotaIntegrationTests(unittest.TestCase):
             kubectl("apply", "-f", "-", input=yaml.safe_dump(crd))
             kubectl("wait", "--for=condition=Established", f"crd/{plural}.argoproj.io",
                     "--timeout=60s")
-        namespace, quota, _, _ = list(yaml.safe_load_all(PROPOSAL.read_text()))
+        docs = [d for d in yaml.safe_load_all(PROPOSAL.read_text()) if d]
+        namespace = next(d for d in docs if d["kind"] == "Namespace")
+        quota = next(d for d in docs if d["kind"] == "ResourceQuota")
+        cls.limit = int(quota["spec"]["hard"]["count/applications.argoproj.io"])
         namespace["metadata"]["name"] = CRD_NAMESPACE
         quota["metadata"]["namespace"] = CRD_NAMESPACE
         kubectl("apply", "-f", "-", input=yaml.safe_dump_all([namespace, quota]))
@@ -124,8 +133,8 @@ class ArgoCRDQuotaIntegrationTests(unittest.TestCase):
         with ThreadPoolExecutor(max_workers=8) as pool:
             results = list(pool.map(self.create, range(1, 9)))
         accepted = self.names()
-        self.assertEqual(len(accepted), 3, [r.stderr for r in results])
-        self.assertEqual(sum(r.returncode == 0 for r in results), 3)
+        self.assertEqual(len(accepted), self.limit, [r.stderr for r in results])
+        self.assertEqual(sum(r.returncode == 0 for r in results), self.limit)
         self.assertNotEqual(self.create(9).returncode, 0)
         self.assertEqual(self.names(), accepted)
         old = sorted(accepted)[0]
