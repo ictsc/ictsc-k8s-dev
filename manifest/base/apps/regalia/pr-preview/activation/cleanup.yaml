@@ -1,5 +1,4 @@
-# Inactive: apply only after the GitHub App credential, image, Argo RBAC and
-# saturated lifecycle test have been reviewed. The dev kustomization omits it.
+# Delete only obsolete Applications owned by the permanent control AppSet.
 apiVersion: v1
 kind: ServiceAccount
 metadata:
@@ -61,8 +60,8 @@ spec:
               type: RuntimeDefault
           containers:
             - name: cleanup
-              image: ghcr.io/ictsc/ictsc-k8s-dev/regalia-preview-cleanup:main
-              imagePullPolicy: Always
+              image: ghcr.io/ictsc/ictsc-k8s-dev/regalia-preview-cleanup@sha256:af5e5d4eb48ecbab2b2232d3a710dc811129ae4f3273251db5bc1fd02db558f8
+              imagePullPolicy: IfNotPresent
               env:
                 - name: GITHUB_APP_ID
                   valueFrom:
