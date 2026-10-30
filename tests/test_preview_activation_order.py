@@ -73,6 +73,16 @@ class PreviewActivationOrderTests(unittest.TestCase):
         self.assertFalse(any("applicationset-namespaces" in arg for arg in args))
         self.assertIn("--enable-leader-election=false", args)
 
+    def test_failed_preview_sync_retries_after_delayed_image_publish(self):
+        appset = self.resource("ApplicationSet", "regalia-pr-preview",
+                               "regalia-preview-control")
+        retry = appset["spec"]["template"]["spec"]["syncPolicy"]["retry"]
+        self.assertGreaterEqual(retry["limit"], 1)
+        self.assertTrue(retry["refresh"])
+        self.assertEqual(retry["backoff"]["duration"], "1m")
+        self.assertEqual(retry["backoff"]["factor"], 2)
+        self.assertEqual(retry["backoff"]["maxDuration"], "5m")
+
 
 if __name__ == "__main__":
     unittest.main()
