@@ -4,8 +4,7 @@ The dev overlay activates `manifest/envs/dev/resources/regalia-pr-preview.yaml`
 with a dedicated, single-namespace ApplicationSet controller in
 `regalia-preview-control`. The chart defaults to `enableExposure: false`, but
 the trusted ApplicationSet passes a boolean `true`. A namespace-scoped quota
-allows two generated Applications while the separate #3500 smoke test remains
-live; raise this to three only after #3500 is normally removed. The controller
+allows three generated Applications. The controller
 does not use Argo CD's multi-namespace ApplicationSet mode or receive
 cluster-wide Secret read permission.
 
@@ -34,9 +33,8 @@ HTTP-01 Certificate, ListenerSet, and routes are rendered only when
 
 ## Quota and cleanup behavior
 
-The dedicated source namespace has a quota of two Application objects while
-#3500 is maintained by a separate test AppSet. Increase it to three only after
-that test is removed. Kubernetes quota admission is the atomic capacity limit.
+The dedicated source namespace has a quota of three Application objects
+(raised from two after the temporary #3500 smoke test was removed). Kubernetes quota admission is the atomic capacity limit.
 Argo CD v3.5.0 creates before deleting during AppSet reconcile: at capacity,
 a waiting PR can prevent an obsolete Application from being removed. On
 2026-10-29, this failure was reproduced with the real v3.5.0 controller in an
