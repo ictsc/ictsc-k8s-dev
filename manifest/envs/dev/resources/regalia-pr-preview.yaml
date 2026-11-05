@@ -1,4 +1,3 @@
-# #3500 remains managed by its temporary AppSet, so reserve one of three slots.
 apiVersion: v1
 kind: Namespace
 metadata:
@@ -17,7 +16,7 @@ spec:
   hard:
     # Kubernetes quota admission serializes concurrent creates. Existing
     # Application objects keep their slot until PR removal deletes them.
-    count/applications.argoproj.io: "2"
+    count/applications.argoproj.io: "3"
     count/applicationsets.argoproj.io: "1"
 ---
 apiVersion: argoproj.io/v1alpha1
