@@ -8,6 +8,8 @@ metadata:
     argocd.argoproj.io/hook-delete-policy: BeforeHookCreation,HookSucceeded
 spec:
   backoffLimit: 3
+  # preview-images already confirmed the image exists, so this deadline is
+  # for the migration itself. Keep the margin for slow schema replays.
   activeDeadlineSeconds: 600
   template:
     metadata:
