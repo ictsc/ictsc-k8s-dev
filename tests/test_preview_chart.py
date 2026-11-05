@@ -43,6 +43,33 @@ class ChartTests(unittest.TestCase):
             self.assertFalse(container_security["allowPrivilegeEscalation"])
             self.assertEqual(container_security["capabilities"]["drop"], ["ALL"])
 
+    def test_missing_images_fail_before_database_without_running_pr_code(self):
+        docs = self.render(True)
+        jobs = {d["metadata"]["name"]: d for d in docs if d["kind"] == "Job"}
+        check, migrate = jobs["preview-images"], jobs["preview-migrate"]
+        wave = lambda d: int(d["metadata"].get("annotations", {}).get(
+            "argocd.argoproj.io/sync-wave", "0"))
+        others = [wave(d) for d in docs if d["metadata"]["name"] != "preview-images"]
+        self.assertLess(wave(check), min(others))
+        self.assertEqual(check["metadata"]["annotations"]["argocd.argoproj.io/hook"], "Sync")
+        # ImagePullBackOff never counts toward backoffLimit; only the
+        # deadline ends a Job whose image was never published.
+        self.assertLessEqual(check["spec"]["activeDeadlineSeconds"], 180)
+        self.assertGreaterEqual(migrate["spec"]["activeDeadlineSeconds"], 600)
+        pod = check["spec"]["template"]["spec"]
+        self.assertFalse(pod["automountServiceAccountToken"])
+        self.assertEqual([c["image"] for c in pod["containers"]], ["postgres:16-alpine"])
+        self.assertNotIn("initContainers", pod)
+        refs = sorted(v["image"]["reference"] for v in pod["volumes"])
+        self.assertEqual(refs, sorted(
+            f"ghcr.io/ictsc/ictsc-regalia/{name}:pr-7-{'a' * 40}"
+            for name in ("backend", "frontend", "migrations")))
+        workload_images = {c["image"] for d in docs if d["kind"] in ("Deployment", "Job")
+                           for c in d["spec"]["template"]["spec"].get("initContainers", [])
+                           + d["spec"]["template"]["spec"]["containers"]
+                           if "ictsc-regalia" in c["image"]}
+        self.assertEqual(workload_images, set(refs))
+
     def test_missing_sha_fails(self):
         result = subprocess.run(["helm", "template", "preview", str(CHART), "--set", "prNumber=7"], capture_output=True)
         self.assertNotEqual(result.returncode, 0)

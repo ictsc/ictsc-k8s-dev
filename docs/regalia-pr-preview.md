@@ -27,7 +27,7 @@ The AppSet is the final root sync wave: quota-full generation can leave it
 Degraded, so it must not block Argo or other infrastructure prerequisites.
 
 The chart supplies one namespace, dedicated CNPG PostgreSQL and Valkey, quota,
-app, migration Job, and scoped NetworkPolicies per PR. The trusted proxy,
+app, image check and migration Jobs, and scoped NetworkPolicies per PR. The trusted proxy,
 HTTP-01 Certificate, ListenerSet, and routes are rendered only when
 `enableExposure` is deliberately set true. The dev Kustomize overlay applies the shared Gateway selector for chart-managed preview namespaces.
 
@@ -129,6 +129,66 @@ only the disposable PR database schema before replay. It fails if psql errors.
 An interrupted multi-statement migration may require deleting the disposable
 PR namespace and recreating it. Fake Discord
 login uses the seeded `preview-contestant` account and sample problems.
+
+## Missing PR images and stale sync operations
+
+**Incident (2026-11-06).** `regalia-pr-3511` started an automated sync for head
+6c02c414. A new commit ff8afd94 arrived right away, so the publisher correctly
+aborted publishing 6c02c414 and its images never existed. The migration hook's
+init container stayed in `Init:ImagePullBackOff`. ImagePullBackOff never
+counts toward a Job's `backoffLimit`; only `activeDeadlineSeconds` (then 600s)
+ended each attempt. The AppSet had already changed the Application to
+ff8afd94, but the operation stayed `Running` and no workloads, Certificate,
+ListenerSet or routes were created (404 with the Gateway's default cert). PR
+#3481 hit the same state for head e2e2a2d1, which was never published.
+
+Argo CD v3.5.0 behavior, from `controller/appcontroller.go`:
+
+- A failed sync with `retry` reruns the **same** operation: the stored
+  `operation.sync.source`, including the old `headSHA` Helm parameter, is kept
+  (`processRequestedAppOperation`). `retry.refresh: true` only clears
+  `sync.revision(s)`, so it re-resolves `main` and does not pick up a new head.
+- While a retry is pending, `app.operation` is still set, and `autoSync` skips
+  with "another operation is in progress".
+- Only after the last retry fails is `operation` cleared. `autoSync` then
+  compares the current spec source with the failed operation's source
+  (`alreadyAttemptedSync`). A changed `headSHA` starts a new sync at once. An
+  unchanged one is not retried ("failed previous sync attempt").
+
+With a 600s deadline and the previous retry setting (limit 3, backoff
+1m/2m/4m), a stale head blocked the current one for about 47 minutes.
+
+**Current behavior.** The first Sync hook, `preview-images` (wave -2, before
+the database), mounts the backend, frontend and migrations images as
+read-only image volumes. A fixed `postgres:16-alpine` container only lists the
+mounts, so no PR code runs and the trust boundary above is unchanged. Its
+deadline is 180s: the existing 70-120MB images pull in well under a minute,
+and kubelet's pull backoff (10s, 20s, 40s, 80s) still notices an image
+published during the attempt. `preview-migrate` keeps its 600s deadline for the
+migration itself. The AppSet retry is limit 3 with 30s/1m/2m backoff. That
+allows about 16 minutes for a delayed publish. Recent push-to-publish times
+were about 3-5 minutes. It also bounds how long a never-published head can
+block the current head. A missing head fails before the database, workloads or
+routes change, so an existing preview keeps serving its previous head.
+
+**Recovery.**
+
+- *Head moved, new images exist:* nothing to do. When retries run out, Argo
+  syncs the current head automatically.
+- *Head never published (e.g. #3481):* the Application stays failed with a
+  `SyncError` condition until a new head is published. If the publisher is
+  rerun for the same head, start a manual sync after the images exist.
+- *Already stuck (operation started before this change, or to skip waiting):*
+  terminate the operation. Argo deletes the running hook, does not retry a
+  terminated operation, and then auto-syncs the current spec:
+
+  ```bash
+  kubectl -n regalia-preview-control patch application regalia-pr-N \
+    --type merge -p '{"status":{"operationState":{"phase":"Terminating"}}}'
+  ```
+
+  This worked for #3511 on 2026-11-06 (it reached Dex after the new sync).
+  `argocd app terminate-op regalia-preview-control/regalia-pr-N` does the same.
 
 ## Operational checks
 

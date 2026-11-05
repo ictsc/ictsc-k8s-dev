@@ -1,0 +1,67 @@
+# Fail fast when the PR head's images were never published (for example the
+# head moved before the publisher finished, so it aborted). ImagePullBackOff
+# never counts toward backoffLimit, so only activeDeadlineSeconds ends a Job
+# waiting for a missing image. Checking here keeps that wait short without
+# shortening preview-migrate's deadline for a genuinely slow migration.
+#
+# Image volumes make kubelet pull all three PR images without running any PR
+# code; the fixed runner only lists the read-only mounts.
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: preview-images
+  annotations:
+    argocd.argoproj.io/hook: Sync
+    # Before the database and every workload, so a missing head changes nothing.
+    argocd.argoproj.io/sync-wave: "-2"
+    argocd.argoproj.io/hook-delete-policy: BeforeHookCreation,HookSucceeded
+spec:
+  backoffLimit: 0
+  # Existing ~70-120MB images pull in well under a minute. The deadline also
+  # bounds every retry attempt of a stale operation; see the AppSet retry.
+  activeDeadlineSeconds: 180
+  template:
+    metadata:
+      labels: {app: preview-images}
+    spec:
+      restartPolicy: Never
+      automountServiceAccountToken: false
+      enableServiceLinks: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65532
+        runAsGroup: 65532
+        seccompProfile: {type: RuntimeDefault}
+      containers:
+        - name: check
+          image: postgres:16-alpine
+          command: [/bin/sh, -ec]
+          args:
+            - |
+              for image in backend frontend migrations; do
+                [ -n "$(ls -A "/images/$image")" ] || { echo "empty image: $image" >&2; exit 1; }
+              done
+          volumeMounts:
+            - {name: backend, mountPath: /images/backend, readOnly: true}
+            - {name: frontend, mountPath: /images/frontend, readOnly: true}
+            - {name: migrations, mountPath: /images/migrations, readOnly: true}
+          resources:
+            requests: {cpu: 10m, memory: 16Mi}
+            limits: {cpu: 100m, memory: 64Mi}
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: {drop: [ALL]}
+      volumes:
+        - name: backend
+          image:
+            reference: ghcr.io/ictsc/ictsc-regalia/backend:pr-{{ .Values.prNumber }}-{{ .Values.headSHA }}
+            pullPolicy: IfNotPresent
+        - name: frontend
+          image:
+            reference: ghcr.io/ictsc/ictsc-regalia/frontend:pr-{{ .Values.prNumber }}-{{ .Values.headSHA }}
+            pullPolicy: IfNotPresent
+        - name: migrations
+          image:
+            reference: ghcr.io/ictsc/ictsc-regalia/migrations:pr-{{ .Values.prNumber }}-{{ .Values.headSHA }}
+            pullPolicy: IfNotPresent

@@ -79,9 +79,23 @@ class PreviewActivationOrderTests(unittest.TestCase):
         retry = appset["spec"]["template"]["spec"]["syncPolicy"]["retry"]
         self.assertGreaterEqual(retry["limit"], 1)
         self.assertTrue(retry["refresh"])
-        self.assertEqual(retry["backoff"]["duration"], "1m")
+        self.assertEqual(retry["backoff"]["duration"], "30s")
         self.assertEqual(retry["backoff"]["factor"], 2)
-        self.assertEqual(retry["backoff"]["maxDuration"], "5m")
+        self.assertEqual(retry["backoff"]["maxDuration"], "2m")
+
+    def test_stale_head_operation_gives_up_quickly(self):
+        # Argo CD retries keep the old headSHA parameter. Bound how long a
+        # never-published head can block a sync of the current head.
+        appset = self.resource("ApplicationSet", "regalia-pr-preview",
+                               "regalia-preview-control")
+        retry = appset["spec"]["template"]["spec"]["syncPolicy"]["retry"]
+        seconds = lambda v: int(v[:-1]) * {"s": 1, "m": 60}[v[-1]]
+        attempt = 180 + 15  # preview-images deadline plus pod start
+        backoff, wait = seconds(retry["backoff"]["duration"]), 0
+        for _ in range(retry["limit"]):
+            wait += min(backoff, seconds(retry["backoff"]["maxDuration"]))
+            backoff *= retry["backoff"]["factor"]
+        self.assertLessEqual((retry["limit"] + 1) * attempt + wait, 20 * 60)
 
 
 if __name__ == "__main__":

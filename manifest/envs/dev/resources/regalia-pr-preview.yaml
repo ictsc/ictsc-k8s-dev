@@ -108,15 +108,20 @@ spec:
           prune: true
           selfHeal: true
         # Images are published by a separate workflow after the PR head is
-        # visible to ApplicationSet. A slow build can make the migration hook
-        # hit its deadline before the image exists; retry that failed sync.
+        # visible to ApplicationSet (about 3-5 minutes). The preview-images
+        # hook fails after 180s while an image is missing; retry that sync.
+        # Argo CD retries the SAME operation, including the old headSHA
+        # parameter (refresh only re-resolves the Git revision). If the head
+        # moved and the old images will never exist, automated sync can start
+        # the new head only after retries run out: 4 attempts x ~3m plus
+        # 30s+1m+2m backoff keeps that under ~16 minutes.
         retry:
           limit: 3
           refresh: true
           backoff:
-            duration: 1m
+            duration: 30s
             factor: 2
-            maxDuration: 5m
+            maxDuration: 2m
         syncOptions:
           - CreateNamespace=true
           - ServerSideApply=true
