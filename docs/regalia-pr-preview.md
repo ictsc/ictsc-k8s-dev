@@ -99,13 +99,26 @@ not isolate sibling hosts from PR JavaScript:** a script on
 `pr-N.k8s-dev.ictsc.net` can set new cookies with
 `Domain=k8s-dev.ictsc.net`, potentially shadowing or flooding cookies sent to
 `contest.k8s-dev.ictsc.net`. HttpOnly protects existing values from reading,
-but does not prevent such writes. The current same-site hostname therefore
-remains an activation blocker for arbitrary PR code. Test it in a browser by
-writing a parent-domain cookie from the PR page and observing the Cookie header
-at a disposable sibling endpoint. Options require a separately reviewed
-browser isolation design, such as an opaque-origin sandbox with a tested API
-bridge, or a separate registrable site for the untrusted app with the requested
-PR URL serving only a trusted entry page. Neither option is implemented here.
+but does not prevent such writes, and the same applies to
+`Domain=ictsc.net` cookies sent to `contest.ictsc.net`.
+
+**Accepted risk (2026-11-06).** A separate registrable domain for previews is
+not available, so this same-site exposure is accepted on these conditions:
+
+- Preview pages are reachable only after Dex GitHub sign-in restricted to
+  members of the `ictsc` GitHub organization. Contestants cannot open a
+  preview, so PR JavaScript runs only in organization members' browsers.
+- Only maintainers who have reviewed the PR head apply the `preview` label.
+  A head pushed after review should be re-reviewed before the preview is
+  trusted again.
+
+The remaining impact is limited to an organization member who opens a
+malicious preview: their sibling-host sessions (contest or admin) may be
+shadowed or flooded. Revisit this decision if previews become reachable
+without organization sign-in or if labeling is automated. Stronger options,
+not implemented here, are a separate registrable site for previews or an
+opaque-origin sandbox with a tested API bridge; `__Host-` prefixed Regalia
+session cookies would additionally prevent shadowing (not flooding).
 
 Only the migration init container uses the PR-supplied migrations image; it
 receives no database password or service-account token and copies SQL into a
@@ -143,10 +156,10 @@ login uses the seeded `preview-contestant` account and sample problems.
    update. Stop activation on unauthorized exposure, failed finalizer/PVC
    teardown, or controller permissions that require cluster-wide Secret reads.
 6. Once #3500 is closed and fully removed, delete its temporary AppSet and
-   AppProject and raise the permanent quota from two to three. Arbitrary PR
-   JavaScript on this parent domain remains unsafe: a trusted operator must
-   review code before labeling it, and untrusted fork heads must not be
-   published without a separate isolation design.
+   AppProject and raise the permanent quota from two to three. Done on
+   2026-11-06 (#45); a fresh labeled PR (ictsc/ictsc-regalia#3510) was then
+   built, published, synced and served over HTTPS behind Dex. Labeling remains
+   a reviewed-maintainer action under the accepted risk above.
 
 Cilium ListenerSet behavior is documented in its
 [v1.20.1 guide](https://github.com/cilium/cilium/blob/v1.20.1/Documentation/network/servicemesh/gateway-api/listenerset.rst).
