@@ -24,6 +24,10 @@ spec:
           imageName: ghcr.io/ictsc/ictsc-regalia/migrations
           commonUpdateSettings:
             updateStrategy: newest-build
+            # Only the PreSync migrate Job uses this image and Argo CD deletes
+            # it on success, so it never shows up in the app's live images.
+            # Without forceUpdate Image Updater would skip it.
+            forceUpdate: true
             allowTags: regexp:^sha-[0-9a-f]{40}$
           manifestTargets:
             kustomize:
