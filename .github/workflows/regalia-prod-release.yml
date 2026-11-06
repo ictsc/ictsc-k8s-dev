@@ -1,0 +1,64 @@
+name: Regalia prod release PR
+# Image Updater commits every regalia main build to the dev overlay. Each of
+# those commits refreshes one PR that moves prod to the same images, so a prod
+# release is a reviewed merge.
+on:
+  push:
+    branches: [main]
+    paths:
+      - manifest/base/apps/regalia/workload/overlays/openapi-dev/kustomization.yaml
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: regalia-prod-release
+  cancel-in-progress: false
+env:
+  BRANCH: release/regalia-prod
+jobs:
+  release-pr:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+      pull-requests: write
+      # PRs opened with GITHUB_TOKEN do not trigger pull_request workflows, so
+      # the GitOps validation is dispatched explicitly.
+      actions: write
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+      - run: python -m pip install PyYAML==6.0.3
+      - name: Copy dev images to prod
+        id: sync
+        run: |
+          python scripts/regalia/sync-prod-images.py --summary "$RUNNER_TEMP/body.md"
+          if git diff --quiet; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          fi
+          tag=$(sed -n 's/^  newTag: \(sha-[0-9a-f]\{7\}\).*/\1/p' manifest/base/apps/regalia/workload/overlays/openapi-prod/kustomization.yaml | head -1)
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+      - name: Open or update the release PR
+        if: steps.sync.outputs.changed == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.sync.outputs.tag }}
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git switch -C "$BRANCH"
+          git add manifest/base/apps/regalia/workload/overlays/openapi-prod/kustomization.yaml
+          git commit -m "release(regalia): deploy ${TAG} to prod"
+          git push --force origin "$BRANCH"
+          title="release(regalia): deploy ${TAG} to prod"
+          number=$(gh pr list --head "$BRANCH" --state open --json number --jq '.[0].number')
+          if [ -n "$number" ]; then
+            gh pr edit "$number" --title "$title" --body-file "$RUNNER_TEMP/body.md"
+          else
+            gh pr create --base main --head "$BRANCH" --title "$title" --body-file "$RUNNER_TEMP/body.md"
+          fi
+          gh workflow run gitops.yml --ref "$BRANCH"

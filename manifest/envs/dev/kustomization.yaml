@@ -39,14 +39,6 @@ patches:
               matchLabels:
                 app.kubernetes.io/part-of: regalia-pr-preview
                 gateway-access: "true"
-  # Preview branch is pinned explicitly; do not follow main images.
-  - patch: |-
-      $patch: delete
-      apiVersion: argocd-image-updater.argoproj.io/v1alpha1
-      kind: ImageUpdater
-      metadata:
-        name: regalia
-        namespace: argocd
   - target: {kind: Application, name: regalia}
     patch: |-
       - op: remove

@@ -68,6 +68,20 @@ spec:
             secretKeyRef:
               name: discord-oauth-client
               key: client-secret
+        # Traces go to Tempo and metrics to Prometheus through the in-cluster
+        # collector (manifest/envs/dev/values/opentelemetry-collector.yaml).
+        - name: POD_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
+        - name: OTEL_EXPORTER_OTLP_ENDPOINT
+          value: http://opentelemetry-collector.monitoring.svc.cluster.local:4317
+        - name: OTEL_EXPORTER_OTLP_PROTOCOL
+          value: grpc
+        - name: OTEL_METRIC_EXPORT_INTERVAL
+          value: '15000'
+        - name: OTEL_RESOURCE_ATTRIBUTES
+          value: deployment.environment.name=dev,k8s.namespace.name=scoreserver,k8s.pod.name=$(POD_NAME)
         ports:
         - name: http
           containerPort: 8080

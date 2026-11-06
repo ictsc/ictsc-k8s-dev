@@ -372,15 +372,25 @@ RegaliaのKubernetesリソースとデプロイ中のimage versionは
 Argo CD Image Updaterが対応するoverlayのbackend/frontendをGit write-backで更新する。
 
 ```text
-main push  -> dev へ sha-<commit>
-v1.2.3 tag -> prod へ v1.2.3
+regalia main push -> dev へ sha-<commit>（自動）
+                  -> prod へのリリースPRを作成・更新（マージで prod へ）
 ```
 
 Image UpdaterはArgo CDに登録済みのこのリポジトリのSSH認証情報を再利用する。
 
-dev は `codex/openapi-contract-rebuild` の OpenAPI 版を試験配置している。
-設定は `manifest/base/apps/regalia/workload/overlays/openapi-dev`。イメージを
-`preview-openapi-20260916-3` タグのdigestで固定し、試験中は dev の ImageUpdater を無効化する。
+- dev: `manifest/base/apps/regalia/workload/overlays/openapi-dev`。Image Updater
+  （`manifest/base/apps/regalia/image-updater.yaml`）が main のビルドごとに
+  backend / frontend / migrations の `sha-<commit>` タグを書き戻す。
+- prod: `manifest/base/apps/regalia/workload/overlays/openapi-prod`。dev overlay の
+  タグが変わるたびに `.github/workflows/regalia-prod-release.yml` が
+  `release/regalia-prod` ブランチの PR を作り直し、dev と同じタグを prod overlay に書く。
+  prod の設定は prod overlay だけに書き、PR のマージが prod へのリリースになる。
+
+dev の migrate Job（PreSync）は migrations イメージ内の SQL を番号順に適用し、
+`schema_migrations` に名前とチェックサムを記録する。適用済みの SQL が変わっていたら
+失敗して止まる。0001/0002 を手で適用済みだった既存DBは、初回に記録だけ行う。
+backend の OpenTelemetry は `monitoring/opentelemetry-collector` へ送り、trace は Tempo、
+metric は Prometheus で見る。
 
 - 参加者: https://contest.k8s-dev.ictsc.net/
 - 管理画面: https://contest.k8s-dev.ictsc.net/admin/ （旧 admin-contest ホストから転送）
