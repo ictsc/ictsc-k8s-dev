@@ -1,3 +1,5 @@
+# Deploys every regalia main build to dev. prod deletes this resource and is
+# updated by the release PR from .github/workflows/regalia-prod-release.yml.
 apiVersion: argocd-image-updater.argoproj.io/v1alpha1
 kind: ImageUpdater
 metadata:
@@ -12,31 +14,33 @@ spec:
     gitConfig:
       repository: git@github.com:ictsc/ictsc-k8s-dev.git
       branch: main
-      writeBackTarget: kustomization:/manifest/base/apps/regalia/workload/overlays/dev
+      writeBackTarget: kustomization:/manifest/base/apps/regalia/workload/overlays/openapi-dev
   applicationRefs:
     - namePattern: regalia
+      # Only main publishes sha-<full commit> tags, so the newest one is the
+      # latest main build. migrations is pushed before backend.
       images:
+        - alias: migrations
+          imageName: ghcr.io/ictsc/ictsc-regalia/migrations
+          commonUpdateSettings:
+            updateStrategy: newest-build
+            allowTags: regexp:^sha-[0-9a-f]{40}$
+          manifestTargets:
+            kustomize:
+              name: migrations
         - alias: backend
-          imageName: ghcr.io/ictsc/ictsc-regalia/backend:sha-f19af1e
+          imageName: ghcr.io/ictsc/ictsc-regalia/backend
           commonUpdateSettings:
             updateStrategy: newest-build
-            allowTags: regexp:^sha-f19af1e$
+            allowTags: regexp:^sha-[0-9a-f]{40}$
           manifestTargets:
             kustomize:
-              name: ghcr.io/ictsc/ictsc-regalia/backend
+              name: backend
         - alias: frontend
-          imageName: ghcr.io/ictsc/ictsc-regalia/frontend:sha-f19af1e
+          imageName: ghcr.io/ictsc/ictsc-regalia/frontend
           commonUpdateSettings:
             updateStrategy: newest-build
-            allowTags: regexp:^sha-f19af1e$
+            allowTags: regexp:^sha-[0-9a-f]{40}$
           manifestTargets:
             kustomize:
-              name: ghcr.io/ictsc/ictsc-regalia/frontend
-        - alias: toolbox
-          imageName: ghcr.io/ictsc/ictsc-regalia/toolbox:sha-f19af1e
-          commonUpdateSettings:
-            updateStrategy: newest-build
-            allowTags: regexp:^sha-f19af1e$
-          manifestTargets:
-            kustomize:
-              name: ghcr.io/ictsc/ictsc-regalia/toolbox
+              name: frontend

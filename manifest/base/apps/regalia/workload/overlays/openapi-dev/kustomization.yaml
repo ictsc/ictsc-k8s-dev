@@ -5,24 +5,20 @@ resources:
 - route-admin.yaml
 - migrate.yaml
 namespace: scoreserver
+# Argo CD Image Updater rewrites these tags on every regalia main build
+# (manifest/base/apps/regalia/image-updater.yaml). The three images come from
+# the same commit.
 images:
 - name: backend
   newName: ghcr.io/ictsc/ictsc-regalia/backend
-  digest: sha256:8917f7672e1237cbf52d29d8fbb1800c6f3a2ef0552a9d49093c570aa06d358e
-  newTag: preview-openapi-20260916-3
+  newTag: sha-a2711a874c6f95566cb153f4543c2c8dc6d124bb
 - name: frontend
   newName: ghcr.io/ictsc/ictsc-regalia/frontend
-  digest: sha256:64a08f59520a3a395c483146705635b0a7a34828e3fbc92ee7cbf2a74ea4b2ab
-  newTag: sha-6030bb6
+  newTag: sha-a2711a874c6f95566cb153f4543c2c8dc6d124bb
+- name: migrations
+  newName: ghcr.io/ictsc/ictsc-regalia/migrations
+  newTag: sha-a2711a874c6f95566cb153f4543c2c8dc6d124bb
 configMapGenerator:
-- name: scoreserver-openapi-migrations
-  files:
-  - 0001_init.sql
-  - 0002_team_color.sql
-  options:
-    annotations:
-      argocd.argoproj.io/hook: PreSync
-      argocd.argoproj.io/sync-wave: '-2'
 - name: scoreserver-discord-teams
   envs:
   - discord.env

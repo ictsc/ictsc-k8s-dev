@@ -19,55 +19,94 @@ spec:
         seccompProfile:
           type: RuntimeDefault
       containers:
-      - name: migrate
-        image: postgres:16
-        imagePullPolicy: IfNotPresent
-        command:
-        - /bin/sh
-        - -ec
-        env:
-        - name: PGHOST
-          valueFrom:
-            secretKeyRef:
-              name: postgres-app
-              key: host
-        - name: PGDATABASE
-          value: ictscore_openapi
-        - name: PGUSER
-          valueFrom:
-            secretKeyRef:
-              name: postgres-app
-              key: username
-        - name: PGPASSWORD
-          valueFrom:
-            secretKeyRef:
-              name: postgres-app
-              key: password
-        resources:
-          requests:
-            cpu: 25m
-            memory: 128Mi
-          limits:
-            cpu: 500m
-            memory: 1Gi
-        securityContext:
-          allowPrivilegeEscalation: false
-          readOnlyRootFilesystem: true
-          capabilities:
-            drop:
-            - ALL
-        args:
-        - "if [ \"$(psql -XAtqc \"SELECT to_regclass('public.teams') IS NOT NULL\"\
-          )\" = f ]; then\n  psql -X -v ON_ERROR_STOP=1 -f /migrations/0001_init.sql\n\
-          fi\nif [ \"$(psql -XAtqc \"SELECT EXISTS (SELECT FROM information_schema.columns\
-          \ WHERE table_schema='public' AND table_name='teams' AND column_name='color')\"\
-          )\" = f ]; then\n  psql -X -v ON_ERROR_STOP=1 -f /migrations/0002_team_color.sql\n\
-          fi\n"
-        volumeMounts:
-        - name: migrations
-          mountPath: /migrations
-          readOnly: true
-      volumes:
-      - name: migrations
-        configMap:
-          name: scoreserver-openapi-migrations
+        # The migrations image is published from the same regalia commit as the
+        # backend, so the SQL always matches the backend that is rolled out.
+        - name: migrate
+          image: migrations
+          imagePullPolicy: IfNotPresent
+          command:
+            - /bin/sh
+            - -ec
+          env:
+            - name: PGHOST
+              valueFrom:
+                secretKeyRef:
+                  name: postgres-app
+                  key: host
+            - name: PGDATABASE
+              value: ictscore_openapi
+            - name: PGUSER
+              valueFrom:
+                secretKeyRef:
+                  name: postgres-app
+                  key: username
+            - name: PGPASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: postgres-app
+                  key: password
+          resources:
+            requests:
+              cpu: 25m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 1Gi
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop:
+                - ALL
+          args:
+            - |
+              set -eu
+              ready=false
+              for attempt in $(seq 1 120); do
+                if PGCONNECT_TIMEOUT=2 psql -XAtqc 'SELECT 1' >/dev/null 2>&1; then
+                  ready=true
+                  break
+                fi
+                sleep 2
+              done
+              if [ "$ready" != true ]; then
+                echo 'Timed out waiting for the database' >&2
+                exit 1
+              fi
+              q() { psql -X -v ON_ERROR_STOP=1 -Atqc "$1"; }
+              q 'CREATE TABLE IF NOT EXISTS schema_migrations (name text PRIMARY KEY, checksum text NOT NULL, applied_at timestamptz NOT NULL DEFAULT now())'
+              # This database was created before migrations were recorded, by
+              # applying 0001 and 0002 by hand. Record them once so they are not
+              # replayed over live data.
+              if [ "$(q 'SELECT count(*) FROM schema_migrations')" = 0 ] && [ "$(q "SELECT to_regclass('public.teams') IS NOT NULL")" = t ]; then
+                if [ "$(q "SELECT EXISTS (SELECT FROM information_schema.columns WHERE table_schema='public' AND table_name='teams' AND column_name='color')")" != t ]; then
+                  echo 'Unrecorded database without teams.color; migrate it by hand' >&2
+                  exit 1
+                fi
+                for name in 0001_init.sql 0002_team_color.sql; do
+                  [ -f "/migrations/$name" ] || { echo "missing $name" >&2; exit 1; }
+                  checksum=$(sha256sum "/migrations/$name" | cut -d' ' -f1)
+                  q "INSERT INTO schema_migrations(name, checksum) VALUES ('$name', '$checksum')"
+                done
+              fi
+              found=false
+              for file in /migrations/[0-9]*.sql; do
+                [ -f "$file" ] || continue
+                found=true
+                name=${file##*/}
+                case "$name" in *[!a-zA-Z0-9_.-]*) echo "bad migration name: $name" >&2; exit 1;; esac
+                checksum=$(sha256sum "$file" | cut -d' ' -f1)
+                stored=$(q "SELECT checksum FROM schema_migrations WHERE name = '$name'")
+                if [ -n "$stored" ]; then
+                  # Applied migrations must never change; this DB keeps real data.
+                  if [ "$stored" != "$checksum" ]; then
+                    echo "applied migration changed: $name" >&2
+                    exit 1
+                  fi
+                  continue
+                fi
+                echo "applying $name"
+                psql -X -v ON_ERROR_STOP=1 -f "$file"
+                q "INSERT INTO schema_migrations(name, checksum) VALUES ('$name', '$checksum')"
+              done
+              [ "$found" = true ] || { echo 'no migrations in image' >&2; exit 1; }
