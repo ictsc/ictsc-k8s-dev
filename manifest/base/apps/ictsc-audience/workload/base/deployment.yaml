@@ -13,6 +13,8 @@ spec:
         runAsGroup: 10001
         fsGroup: 10001
         runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
       containers:
         - name: otelcol
           # 設定（otelcol.yaml, tls.yaml, gateway.yaml）はイメージに入っている。タグは kustomization の images で決める
