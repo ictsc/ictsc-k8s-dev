@@ -18,4 +18,4 @@ configMapGenerator:
       - schedule.yaml=schedule.yaml
 images:
   - name: ghcr.io/ictsc/ictsc-audience-collector
-    newTag: sha-25d202f
+    digest: sha256:4df55dd78a0e3580b536c9fca6e2d38f9c804d29e5209b1dfd675d870a3a1f64
