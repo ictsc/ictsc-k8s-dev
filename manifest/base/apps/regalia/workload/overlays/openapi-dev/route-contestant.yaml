@@ -12,6 +12,15 @@ spec:
   hostnames:
   - contest.k8s-dev.ictsc.net
   rules:
+  # The backend validates GitHub Actions OIDC for this machine endpoint.
+  - matches:
+    - method: POST
+      path:
+        type: Exact
+        value: /api/v1/admin/content/actions/refresh
+    backendRefs:
+    - name: scoreserver-backend
+      port: 8080
   - matches:
     - path:
         type: PathPrefix
