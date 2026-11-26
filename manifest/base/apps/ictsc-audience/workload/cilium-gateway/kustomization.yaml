@@ -43,8 +43,3 @@ patches:
         externalTrafficPolicy: null
         ports:
           - {port: 6514, $patch: delete}
-  - target: {kind: PersistentVolumeClaim, name: collector-data}
-    patch: |-
-      - op: add
-        path: /spec/storageClassName
-        value: longhorn
