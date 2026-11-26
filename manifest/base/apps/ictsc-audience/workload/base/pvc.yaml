@@ -1,0 +1,12 @@
+# file 出力（/data/events.jsonl とローテーションした過去分）。
+# 125 台・競技 1 日（8 時間）で約 2.6〜9.3 GB（docs/RESOURCES.md）。増やすときは deployment.yaml の
+# COLLECTOR_MAX_BACKUPS も「GB × 7.5」程度に上げる（ストレージクラスが拡張に対応していれば、その場で大きくできる）。
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: collector-data
+spec:
+  accessModes: [ReadWriteOnce]
+  resources:
+    requests:
+      storage: 20Gi

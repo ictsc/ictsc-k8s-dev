@@ -1,0 +1,17 @@
+# 送信元 IP（teamrt の NAT 後の IP）でチームを決めるので、externalTrafficPolicy: Local で保つ。
+# 公開範囲は overlays で loadBalancerSourceRanges を teamrt のグローバル IP に絞ること。
+# VyOS の syslog（6514、TCP+TLS）も同じ Service で公開する。
+apiVersion: v1
+kind: Service
+metadata:
+  name: collector
+spec:
+  type: LoadBalancer
+  externalTrafficPolicy: Local
+  ports:
+    - name: otlp-http
+      port: 4318
+      targetPort: otlp-http
+    - name: syslog
+      port: 6514
+      targetPort: syslog

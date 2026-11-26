@@ -61,3 +61,4 @@ spec:
     - longhorn.k8s.ictsc.net
     - contest.k8s.ictsc.net
     - admin-contest.k8s.ictsc.net
+    - collector.k8s.ictsc.net

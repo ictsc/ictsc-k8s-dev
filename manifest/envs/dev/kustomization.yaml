@@ -1,5 +1,6 @@
 resources:
   - ../../base
+  - ./resources/ictsc-audience.yaml
   - ../../base/infra/plugin-barman-cloud
   - ../../base/infra/external-secrets
   - ./resources/infra-secrets.yaml

@@ -317,6 +317,7 @@ spec:
 ${longhorn_certificate_dns_name}
     - contest.${domain}
     - admin-contest.${domain}
+    - collector.${domain}
 EOF
 
 cat > "${d}/resources/cluster-issuer.yaml" <<EOF
