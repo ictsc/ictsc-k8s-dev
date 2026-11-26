@@ -11,13 +11,13 @@ namespace: scoreserver
 images:
 - name: backend
   newName: ghcr.io/ictsc/ictsc-regalia/backend
-  newTag: sha-a2711a874c6f95566cb153f4543c2c8dc6d124bb
+  newTag: sha-598aa8e3b5d95c8836e9594c950556928480e1ad
 - name: frontend
   newName: ghcr.io/ictsc/ictsc-regalia/frontend
-  newTag: sha-a2711a874c6f95566cb153f4543c2c8dc6d124bb
+  newTag: sha-598aa8e3b5d95c8836e9594c950556928480e1ad
 - name: migrations
   newName: ghcr.io/ictsc/ictsc-regalia/migrations
-  newTag: sha-a2711a874c6f95566cb153f4543c2c8dc6d124bb
+  newTag: sha-598aa8e3b5d95c8836e9594c950556928480e1ad
 configMapGenerator:
 - name: scoreserver-discord-teams
   envs:
