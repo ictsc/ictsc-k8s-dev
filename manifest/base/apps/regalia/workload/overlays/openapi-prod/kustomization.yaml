@@ -16,15 +16,6 @@ images:
   newName: ghcr.io/ictsc/ictsc-regalia/migrations
   newTag: sha-598aa8e3b5d95c8836e9594c950556928480e1ad
 configMapGenerator:
-- name: scoreserver-openapi-migrations
-  files:
-  - 0001_init.sql
-  - 0002_team_color.sql
-  - 0003_demo_seed.sql
-  options:
-    annotations:
-      argocd.argoproj.io/hook: PreSync
-      argocd.argoproj.io/sync-wave: '-2'
 - name: scoreserver-discord-teams
   envs:
   - discord.env
