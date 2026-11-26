@@ -61,7 +61,33 @@ data:
               "limit": 20,
               "tableType": "traces"
             }
-          ]
+          ],
+          "fieldConfig": {
+            "defaults": {},
+            "overrides": [
+              {
+                "matcher": {
+                  "id": "byRegexp",
+                  "options": "/^(trace\\s*id|Trace ID)$/i"
+                },
+                "properties": [
+                  {
+                    "id": "links",
+                    "value": [
+                      {
+                        "title": "Open trace waterfall",
+                        "url": "/d/regalia-traces-dev/regalia-traces-dev?from=${__from}&to=${__to}&var-traceId=${__value.raw}&viewPanel=4"
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          "options": {
+            "cellHeight": "sm",
+            "showHeader": true
+          }
         },
         {
           "datasource": {
@@ -89,7 +115,33 @@ data:
               "limit": 20,
               "tableType": "traces"
             }
-          ]
+          ],
+          "fieldConfig": {
+            "defaults": {},
+            "overrides": [
+              {
+                "matcher": {
+                  "id": "byRegexp",
+                  "options": "/^(trace\\s*id|Trace ID)$/i"
+                },
+                "properties": [
+                  {
+                    "id": "links",
+                    "value": [
+                      {
+                        "title": "Open trace waterfall",
+                        "url": "/d/regalia-traces-dev/regalia-traces-dev?from=${__from}&to=${__to}&var-traceId=${__value.raw}&viewPanel=4"
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          "options": {
+            "cellHeight": "sm",
+            "showHeader": true
+          }
         },
         {
           "datasource": {
@@ -117,7 +169,33 @@ data:
               "limit": 20,
               "tableType": "traces"
             }
-          ]
+          ],
+          "fieldConfig": {
+            "defaults": {},
+            "overrides": [
+              {
+                "matcher": {
+                  "id": "byRegexp",
+                  "options": "/^(trace\\s*id|Trace ID)$/i"
+                },
+                "properties": [
+                  {
+                    "id": "links",
+                    "value": [
+                      {
+                        "title": "Open trace waterfall",
+                        "url": "/d/regalia-traces-dev/regalia-traces-dev?from=${__from}&to=${__to}&var-traceId=${__value.raw}&viewPanel=4"
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          "options": {
+            "cellHeight": "sm",
+            "showHeader": true
+          }
         },
         {
           "datasource": {
@@ -125,8 +203,8 @@ data:
             "uid": "tempo"
           },
           "id": 4,
-          "title": "Trace waterfall",
-          "description": "Paste a Trace ID from a table into the dashboard\u2019s Trace ID field.",
+          "title": "Trace waterfall (select a Trace ID)",
+          "description": "Choose a Trace ID in the search results or paste one into the Trace ID field. The panel is empty until a trace is selected.",
           "type": "traces",
           "gridPos": {
             "x": 0,
