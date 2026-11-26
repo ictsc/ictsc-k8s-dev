@@ -1,0 +1,7 @@
+# 生成物：collector/gen-schedule.sh で作った。手で直さないこと。
+processors:
+  filter/schedule:
+    error_mode: ignore
+    logs:
+      log_record:
+        - 'false'   # 時間帯の指定なし：いつでも受け付ける

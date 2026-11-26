@@ -1,0 +1,72 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: collector
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate   # PVC が ReadWriteOnce なので、新旧を同時に動かさない
+  template:
+    spec:
+      securityContext:
+        runAsUser: 10001
+        runAsGroup: 10001
+        fsGroup: 10001
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: otelcol
+          # 設定（otelcol.yaml, tls.yaml, gateway.yaml）はイメージに入っている。タグは kustomization の images で決める
+          image: ghcr.io/ictsc/ictsc-audience-collector
+          args:
+            - --config=/etc/otelcol/otelcol.yaml
+            - --config=/etc/otelcol/tls.yaml      # 前段のプロキシが TLS を終端するなら gateway.yaml に替える
+            - --config=/etc/otelcol/teams-map/teams.yaml
+            - --config=/etc/otelcol/teams-map/schedule.yaml   # 受け付ける時間帯（競技時間）
+          env:
+            # ファイル出力のローテーションの世代数（100 MB ずつ）。PVC（20 Gi）の 75% = 150 世代
+            - name: COLLECTOR_MAX_BACKUPS
+              value: "150"
+          ports:
+            - name: otlp-http
+              containerPort: 4318
+            - name: syslog
+              containerPort: 6514
+            - name: health
+              containerPort: 13133
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              memory: 512Mi
+          livenessProbe:
+            httpGet: {path: /healthz, port: health}
+            periodSeconds: 10
+          readinessProbe:
+            httpGet: {path: /healthz, port: health}
+            periodSeconds: 5
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: {drop: [ALL]}
+          volumeMounts:
+            - {name: teams, mountPath: /etc/otelcol/teams-map, readOnly: true}
+            - {name: tls, mountPath: /etc/otelcol/certs, readOnly: true}
+            - {name: token, mountPath: /etc/otelcol/token, subPath: token, readOnly: true}
+            - {name: data, mountPath: /data}
+      volumes:
+        - name: teams
+          configMap:
+            name: collector-teams
+        - name: tls
+          secret:
+            secretName: collector-tls       # tls.crt / tls.key（cert-manager か手で作る）
+        - name: token
+          secret:
+            secretName: collector-token     # token
+            defaultMode: 0400
+        - name: data
+          persistentVolumeClaim:
+            claimName: collector-data

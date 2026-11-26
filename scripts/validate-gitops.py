@@ -19,6 +19,7 @@ KUBERNETES = '1.36.0'
 BOOTSTRAP_SCHEMAS = [
     'https://github.com/kubernetes-sigs/gateway-api/releases/download/v1.6.1/experimental-install.yaml',
     'https://raw.githubusercontent.com/cilium/cilium/v1.20.1/pkg/k8s/apis/cilium.io/client/crds/v2/ciliumloadbalancerippools.yaml',
+    'https://raw.githubusercontent.com/cilium/cilium/v1.20.1/pkg/k8s/apis/cilium.io/client/crds/v2/ciliumnetworkpolicies.yaml',
     'https://raw.githubusercontent.com/cilium/cilium/v1.20.1/pkg/k8s/apis/cilium.io/client/crds/v2alpha1/ciliuml2announcementpolicies.yaml',
 ]
 

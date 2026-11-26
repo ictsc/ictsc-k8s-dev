@@ -1,0 +1,20 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: ictsc-audience
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: git@github.com:ictsc/ictsc-k8s-dev.git
+    targetRevision: refs/heads/main
+    path: manifest/base/apps/ictsc-audience/workload/dev
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: ictsc-audience
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - ServerSideApply=true

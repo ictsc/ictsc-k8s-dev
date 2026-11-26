@@ -1,0 +1,10 @@
+# 送信元 IP（teamrt の NAT 後のグローバル IP）→ チームの対応表。
+# otelcol.yaml と一緒に --config で渡す（イメージには、この例が入っている）。本番では Terraform の出力などから生成する
+# （collector/gen-teams.sh）。下の行は例（TEST-NET-3 のアドレス）なので、そのままでは何にも当たらない。
+processors:
+  transform/team:
+    error_mode: ignore
+    log_statements:
+      - context: log
+        statements:
+          - set(resource.attributes["ictsc.team"], "example") where attributes["ictsc.source_ip"] == "203.0.113.10" or attributes["ictsc.source_ip"] == "64:ff9b::cb00:710a" or attributes["ictsc.source_ip"] == "::ffff:203.0.113.10"

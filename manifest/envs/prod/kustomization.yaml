@@ -1,5 +1,6 @@
 resources:
   - ../../base
+  - ./resources/ictsc-audience.yaml
   - ../../base/infra/plugin-barman-cloud
   - ./resources/postgres-backup-alerts.yaml
   - ./edge-application.yaml
