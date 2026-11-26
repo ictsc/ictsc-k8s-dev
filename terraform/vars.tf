@@ -106,7 +106,7 @@ variable "control_plane_cpu" {
 variable "control_plane_mem" {
   type = map(number)
   default = {
-    dev  = 4
+    dev  = 8
     prod = 4
   }
 }
