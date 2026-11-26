@@ -50,6 +50,23 @@ spec:
           value: redis://valkey-proxy:6379/2
         - name: ICTSC_DEV_FAKE_MODE
           value: 'true'
+        - name: ICTSC_SECONDARY_QUALIFIER_MODE
+          value: 'true'
+        - name: ICTSC_GITHUB_REPOSITORY
+          value: ictsc/ictsc2026-pr2-master
+        - name: ICTSC_GITHUB_REPOSITORY_ID
+          value: '1418858779'
+        - name: ICTSC_GITHUB_REF
+          value: refs/heads/main
+        - name: ICTSC_GITHUB_WORKFLOW_REF
+          value: ictsc/ictsc2026-pr2-master/.github/workflows/regalia-refresh.yaml@refs/heads/main
+        - name: ICTSC_GITHUB_OIDC_AUDIENCE
+          value: regalia-2026-pr2-dev
+        - name: ICTSC_GITHUB_API_TOKEN
+          valueFrom:
+            secretKeyRef:
+              name: regalia-content-github
+              key: token
         - name: ICTSC_SECURE_COOKIES
           value: 'true'
         - name: ICTSC_ALLOWED_ORIGINS
