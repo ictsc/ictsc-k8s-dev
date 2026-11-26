@@ -23,6 +23,7 @@ resources:
   - ./resources/tempo.yaml
   - ./resources/opentelemetry-collector.yaml
   - ./resources/regalia-dev-grafana-dashboard.yaml
+  - ./resources/regalia-traces-dev-grafana-dashboard.yaml
   - ./resources/opentelemetry-alerts.yaml
 
 patches:

@@ -1,0 +1,152 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: regalia-traces-dev-grafana-dashboard
+  namespace: monitoring
+  labels:
+    grafana_dashboard: "1"
+data:
+  regalia-traces-dev.json: |
+    {
+      "uid": "regalia-traces-dev",
+      "title": "Regalia Traces / dev",
+      "tags": [
+        "regalia",
+        "tempo",
+        "dev"
+      ],
+      "schemaVersion": 39,
+      "time": {
+        "from": "now-1h",
+        "to": "now"
+      },
+      "templating": {
+        "list": [
+          {
+            "name": "traceId",
+            "label": "Trace ID",
+            "type": "textbox",
+            "query": "",
+            "current": {
+              "text": "",
+              "value": ""
+            }
+          }
+        ]
+      },
+      "panels": [
+        {
+          "datasource": {
+            "type": "tempo",
+            "uid": "tempo"
+          },
+          "id": 1,
+          "title": "Recent Regalia requests",
+          "type": "table",
+          "gridPos": {
+            "x": 0,
+            "y": 0,
+            "w": 24,
+            "h": 10
+          },
+          "targets": [
+            {
+              "datasource": {
+                "type": "tempo",
+                "uid": "tempo"
+              },
+              "refId": "A",
+              "queryType": "traceql",
+              "query": "{ resource.service.name = \"ictsc-regalia-api\" && kind = server } with (most_recent=true)",
+              "limit": 20,
+              "tableType": "traces"
+            }
+          ]
+        },
+        {
+          "datasource": {
+            "type": "tempo",
+            "uid": "tempo"
+          },
+          "id": 2,
+          "title": "Errors",
+          "type": "table",
+          "gridPos": {
+            "x": 0,
+            "y": 10,
+            "w": 12,
+            "h": 9
+          },
+          "targets": [
+            {
+              "datasource": {
+                "type": "tempo",
+                "uid": "tempo"
+              },
+              "refId": "A",
+              "queryType": "traceql",
+              "query": "{ resource.service.name = \"ictsc-regalia-api\" && kind = server && status = error } with (most_recent=true)",
+              "limit": 20,
+              "tableType": "traces"
+            }
+          ]
+        },
+        {
+          "datasource": {
+            "type": "tempo",
+            "uid": "tempo"
+          },
+          "id": 3,
+          "title": "Slow requests (> 500 ms)",
+          "type": "table",
+          "gridPos": {
+            "x": 12,
+            "y": 10,
+            "w": 12,
+            "h": 9
+          },
+          "targets": [
+            {
+              "datasource": {
+                "type": "tempo",
+                "uid": "tempo"
+              },
+              "refId": "A",
+              "queryType": "traceql",
+              "query": "{ resource.service.name = \"ictsc-regalia-api\" && kind = server && duration > 500ms } with (most_recent=true)",
+              "limit": 20,
+              "tableType": "traces"
+            }
+          ]
+        },
+        {
+          "datasource": {
+            "type": "tempo",
+            "uid": "tempo"
+          },
+          "id": 4,
+          "title": "Trace waterfall",
+          "description": "Paste a Trace ID from a table into the dashboard\u2019s Trace ID field.",
+          "type": "traces",
+          "gridPos": {
+            "x": 0,
+            "y": 19,
+            "w": 24,
+            "h": 15
+          },
+          "targets": [
+            {
+              "datasource": {
+                "type": "tempo",
+                "uid": "tempo"
+              },
+              "refId": "A",
+              "queryType": "traceql",
+              "query": "${traceId}",
+              "limit": 20,
+              "tableType": "traces"
+            }
+          ]
+        }
+      ]
+    }
