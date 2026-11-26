@@ -69,4 +69,4 @@ spec:
             defaultMode: 0400
         - name: data
           persistentVolumeClaim:
-            claimName: collector-data
+            claimName: collector-data-nfs
