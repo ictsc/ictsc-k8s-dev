@@ -6,11 +6,6 @@ grafana:
   # The persistent RWO volume cannot be attached to old and new pods together.
   deploymentStrategy:
     type: Recreate
-  grafana.ini:
-    auth.generic_oauth:
-      role_attribute_path: "'Viewer'"
-      org_attribute_path: "contains(groups || `[]`, 'ictsc:ictsc2026') && ['ictsc2026'] || `null`"
-      org_mapping: "ictsc2026:1:Admin ictsc2026:2:Viewer"
   env:
     GF_PLUGINS_PREINSTALL_SYNC: victoriametrics-logs-datasource@0.34.0
   dashboardProviders:
@@ -18,17 +13,16 @@ grafana:
       apiVersion: 1
       providers:
         - name: Audience
-          orgId: 2
+          orgId: 1
           type: file
           options:
             path: /var/lib/grafana/dashboards/audience
   dashboardsConfigMaps:
     audience: audience-command-logs
   additionalDataSources:
-    # Audience organization is created through the Grafana server admin API.
     - name: Audience VictoriaLogs
       uid: audience-victorialogs
-      orgId: 2
+      orgId: 1
       type: victoriametrics-logs-datasource
       access: proxy
       url: http://audience-victorialogs.ictsc-audience.svc.cluster.local:9428
