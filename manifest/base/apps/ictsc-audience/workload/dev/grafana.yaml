@@ -55,7 +55,15 @@ spec:
           volumeMounts:
             - {name: data, mountPath: /var/lib/grafana}
             - {name: datasources, mountPath: /etc/grafana/provisioning/datasources, readOnly: true}
+            - {name: dashboard-provider, mountPath: /etc/grafana/provisioning/dashboards, readOnly: true}
+            - {name: dashboards, mountPath: /etc/grafana/audience-dashboards, readOnly: true}
       volumes:
+        - name: dashboard-provider
+          configMap:
+            name: audience-grafana-dashboard-provider
+        - name: dashboards
+          configMap:
+            name: audience-grafana-dashboards
         - name: data
           emptyDir: {}
         - name: datasources
