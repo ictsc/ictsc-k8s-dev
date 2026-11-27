@@ -35,7 +35,7 @@ spec:
           args:
             - -storageDataPath=/data
             - -retentionPeriod=7d
-            - -retention.maxDiskSpaceUsagePercent=80
+            - -retention.maxDiskUsagePercent=80
           ports:
             - {name: http, containerPort: 9428}
           readinessProbe:
