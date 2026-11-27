@@ -6,6 +6,12 @@ resources:
   - victorialogs.yaml
   - grafana.yaml
 configMapGenerator:
+  - name: audience-grafana-dashboard-provider
+    files:
+      - grafana-dashboards.yaml
+  - name: audience-grafana-dashboards
+    files:
+      - audience-command-logs.json
   - name: collector-victorialogs
     files:
       - collector-export.yaml
