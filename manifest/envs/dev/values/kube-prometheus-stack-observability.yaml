@@ -9,16 +9,16 @@ grafana:
   env:
     GF_PLUGINS_PREINSTALL_SYNC: victoriametrics-logs-datasource@0.34.0
   dashboardProviders:
-    audience.yaml:
+    audience-main.yaml:
       apiVersion: 1
       providers:
-        - name: Audience
+        - name: Audience Main
           orgId: 1
           type: file
           options:
-            path: /var/lib/grafana/dashboards/audience
+            path: /var/lib/grafana/dashboards/audience-main
   dashboardsConfigMaps:
-    audience: audience-command-logs
+    audience-main: audience-command-logs
   additionalDataSources:
     - name: Audience VictoriaLogs
       uid: audience-victorialogs
