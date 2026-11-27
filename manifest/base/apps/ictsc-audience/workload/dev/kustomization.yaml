@@ -1,10 +1,40 @@
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
+namespace: ictsc-audience
 resources:
   - ../cilium-gateway
+  - victorialogs.yaml
+  - grafana.yaml
+configMapGenerator:
+  - name: collector-victorialogs
+    files:
+      - collector-export.yaml
 patches:
   - target: {kind: HTTPRoute, name: collector}
     patch: |-
       - op: add
         path: /spec/hostnames
         value: [collector.k8s-dev.ictsc.net]
+  - target: {kind: Deployment, name: collector}
+    patch: |-
+      - op: add
+        path: /spec/template/spec/containers/0/args/-
+        value: --config=/etc/otelcol/export/collector-export.yaml
+  - patch: |-
+      apiVersion: apps/v1
+      kind: Deployment
+      metadata:
+        name: collector
+      spec:
+        template:
+          spec:
+            containers:
+              - name: otelcol
+                volumeMounts:
+                  - name: victorialogs-config
+                    mountPath: /etc/otelcol/export
+                    readOnly: true
+            volumes:
+              - name: victorialogs-config
+                configMap:
+                  name: collector-victorialogs

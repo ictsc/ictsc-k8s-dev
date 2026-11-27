@@ -1,0 +1,12 @@
+exporters:
+  otlphttp/victorialogs:
+    logs_endpoint: http://audience-victorialogs:9428/insert/opentelemetry/v1/logs
+    encoding: proto
+    timeout: 5s
+    sending_queue:
+      enabled: true
+      queue_size: 100
+service:
+  pipelines:
+    logs:
+      exporters: [file, otlphttp/victorialogs]
