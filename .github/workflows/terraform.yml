@@ -37,7 +37,7 @@ jobs:
       TF_WORKSPACE: dev
     steps:
       - uses: actions/checkout@v5
-      - uses: aquaproj/aqua-installer@v4.0.5
+      - uses: aquaproj/aqua-installer@v4.1.2
         with:
           aqua_version: v2.62.3
       - name: Validate without backend credentials or cluster PKI
@@ -82,7 +82,7 @@ jobs:
         run: sudo apt-get update -qq && sudo apt-get install -y xorriso
 
       - name: aqua で CLI を導入
-        uses: aquaproj/aqua-installer@v4.0.5
+        uses: aquaproj/aqua-installer@v4.1.2
         with:
           aqua_version: v2.62.3
 
