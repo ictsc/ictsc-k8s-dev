@@ -12,7 +12,7 @@ spec:
 apiVersion: apps/v1
 kind: StatefulSet
 metadata:
-  name: audience-victorialogs
+  name: audience-victorialogs-nfs
 spec:
   serviceName: audience-victorialogs
   selector:
@@ -35,7 +35,7 @@ spec:
           args:
             - -storageDataPath=/data
             - -retentionPeriod=7d
-            - -retention.maxDiskUsagePercent=80
+            - -retention.maxDiskSpaceUsageBytes=4GiB
           ports:
             - {name: http, containerPort: 9428}
           readinessProbe:
@@ -47,12 +47,12 @@ spec:
             allowPrivilegeEscalation: false
             capabilities: {drop: [ALL]}
           volumeMounts:
-            - {name: data, mountPath: /data}
+            - {name: logs, mountPath: /data}
   volumeClaimTemplates:
     - metadata:
-        name: data
+        name: logs
       spec:
-        storageClassName: longhorn-single-replica
+        storageClassName: nfs
         accessModes: [ReadWriteOnce]
         resources:
           requests:
