@@ -24,7 +24,7 @@ resource "sakura_disk" "worker_node" {
   }
 }
 
-# prod の Longhorn レプリカデータ専用。dev は 40 GiB のコピー先を使用する。
+# prod の切り戻しに使う旧 Longhorn SSD。
 resource "sakura_disk" "longhorn" {
   count = local.longhorn_enabled && local.env != "dev" ? local.worker_node_count : 0
 
@@ -35,6 +35,47 @@ resource "sakura_disk" "longhorn" {
   size      = var.longhorn_disk_size[local.env]
 
   # size の変更は既存データを消す replacement になる。prod の誤削除を防ぐ。
+  lifecycle {
+    prevent_destroy = true
+  }
+
+  timeouts = {
+    create = "1h"
+    delete = "1h"
+  }
+}
+
+# prod worker の Longhorn データを保持した 40 GiB SSD。
+resource "sakura_disk" "prod_worker1_longhorn_40g" {
+  count = local.longhorn_enabled && local.env == "prod" ? 1 : 0
+
+  name           = "${local.name}-worker-1-longhorn-40g"
+  tags           = [var.prefix, local.env, "worker-node", "longhorn"]
+  plan           = "ssd"
+  connector      = "virtio"
+  size           = 40
+  source_disk_id = sakura_disk.longhorn[0].id
+
+  lifecycle {
+    prevent_destroy = true
+  }
+
+  timeouts = {
+    create = "1h"
+    delete = "1h"
+  }
+}
+
+resource "sakura_disk" "prod_other_workers_longhorn_40g" {
+  count = local.longhorn_enabled && local.env == "prod" ? max(0, local.worker_node_count - 1) : 0
+
+  name           = "${local.name}-worker-${count.index + 2}-longhorn-40g"
+  tags           = [var.prefix, local.env, "worker-node", "longhorn"]
+  plan           = "ssd"
+  connector      = "virtio"
+  size           = 40
+  source_disk_id = sakura_disk.longhorn[count.index + 1].id
+
   lifecycle {
     prevent_destroy = true
   }
@@ -95,8 +136,10 @@ resource "sakura_server" "worker_node" {
   disks = concat(
     [sakura_disk.worker_node[count.index].id],
     local.longhorn_enabled ? [
-      local.env == "dev" && count.index > 0 ? sakura_disk.dev_other_workers_longhorn_40g[count.index - 1].id : (
-        local.env == "dev" && count.index == 0 ? sakura_disk.dev_worker1_longhorn_40g[0].id : sakura_disk.longhorn[count.index].id
+      local.env == "dev" ? (
+        count.index == 0 ? sakura_disk.dev_worker1_longhorn_40g[0].id : sakura_disk.dev_other_workers_longhorn_40g[count.index - 1].id
+        ) : (
+        count.index == 0 ? sakura_disk.prod_worker1_longhorn_40g[0].id : sakura_disk.prod_other_workers_longhorn_40g[count.index - 1].id
       )
     ] : [],
   )
