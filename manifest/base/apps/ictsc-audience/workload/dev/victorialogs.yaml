@@ -75,5 +75,12 @@ spec:
         - podSelector:
             matchLabels:
               app: audience-grafana
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: monitoring
+          podSelector:
+            matchLabels:
+              app.kubernetes.io/name: grafana
+              app.kubernetes.io/instance: kube-prometheus-stack
       ports:
         - {protocol: TCP, port: 9428}

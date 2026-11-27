@@ -27,6 +27,14 @@ resources:
   - ./resources/regalia-traces-dev-grafana-dashboard.yaml
   - ./resources/opentelemetry-alerts.yaml
 
+configMapGenerator:
+  - name: audience-command-logs
+    namespace: monitoring
+    options:
+      disableNameSuffixHash: true
+    files:
+      - ./resources/audience-command-logs.json
+
 patches:
   - patch: |-
       apiVersion: gateway.networking.k8s.io/v1
