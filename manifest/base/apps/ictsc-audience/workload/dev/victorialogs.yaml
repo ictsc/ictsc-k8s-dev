@@ -72,9 +72,6 @@ spec:
         - podSelector:
             matchLabels:
               app.kubernetes.io/name: ictsc-audience-collector
-        - podSelector:
-            matchLabels:
-              app: audience-grafana
         - namespaceSelector:
             matchLabels:
               kubernetes.io/metadata.name: monitoring
