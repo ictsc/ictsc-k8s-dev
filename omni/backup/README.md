@@ -93,3 +93,24 @@ devの認証をprodへ流用せず、Omniだけを唯一の認証情報保管先
 管理者による `EtcdBackupS3Configs` の設定と初回成功確認が必要。
 Omni VM本体のresticバックアップとは別の未完了項目としてIssue #14で追跡する。
 設定方法は[公式etcdバックアップ手順](https://omni.siderolabs.com/how-to-guides/etcd-backups)を参照。
+
+### Omni 1.13 以降の embedded etcd
+
+Omni 1.13 から embedded etcd の外部リスナーは既定で無効になる。
+Omni の起動設定で loopback の TLS リスナーを有効にし、サーバー証明書・鍵と
+クライアント証明書の CA を `--etcd-embedded-cert-path`、`--etcd-embedded-key-path`、
+`--etcd-embedded-ca-path` に指定する。サーバー証明書の SAN には接続先の IP または DNS 名を含める。
+
+バックアップサービスの root 専用環境ファイルには、以下を追加する。ファイルのパスは
+ホスト上の実際の配置に合わせる。
+
+```sh
+OMNI_ETCD_ENDPOINT=https://127.0.0.1:2379
+ETCDCTL_CACERT=/opt/omni/etcd-tls/ca.crt
+ETCDCTL_CERT=/opt/omni/etcd-tls/backup-client.crt
+ETCDCTL_KEY=/opt/omni/etcd-tls/backup-client.key
+```
+
+更新前に現行の設定でバックアップを取り、更新後は TLS 経由で改めて
+`omni-backup.service` を実行する。snapshot の取得と restic への保存の両方が
+成功したことを確認する。
