@@ -1,5 +1,18 @@
 tempo:
   retention: 168h
+  metricsGenerator:
+    enabled: true
+    processor:
+      local_blocks:
+        flush_to_storage: true
+    storage:
+      path: /var/tempo/metrics
+    traces_storage:
+      path: /var/tempo/metrics-traces
+  overrides:
+    defaults:
+      metrics_generator:
+        processors: [local-blocks]
   storage:
     trace:
       backend: local
